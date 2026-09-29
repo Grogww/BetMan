@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # 🦇 BetMan
 
 Casa de apostas **fictícia** (sem dinheiro real) usada como artefato base do projeto final de DevOps.
