@@ -1,0 +1,17 @@
+# Git
+.git
+.gitignore
+
+# IDE
+.idea/
+.vscode/
+
+# Maven
+target/
+.m2/
+
+# Testes
+src/test/
+
+# Documentação
+*.md
