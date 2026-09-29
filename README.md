@@ -7,6 +7,43 @@ que serão construídas nas próximas fases.
 Stack: Java 21 · Spring Boot 4.1 · Spring Web MVC · Spring Data JPA/Hibernate · PostgreSQL 16+ ·
 Flyway · Bean Validation · Lombok · HTML/CSS/JS puro.
 
+## Projeto Prático DevOps — Automação, Monitoramento e Observabilidade
+
+Objetivo: subir uma aplicação Java Spring e, sobre ela:
+
+- conteinerizar;
+- criar a esteira de CI/CD;
+- subir localmente a pilha de monitoramento;
+- implementar observabilidade;
+- implementar a gestão centralizada de logs.
+
+### Requisitos obrigatórios
+
+- [ ] Dockerfile com **Multistage Build** para gerar a imagem de produção
+  - [ ] Estágio 1 (Build): imagem com Maven/JDK para compilar e gerar o `.jar`
+  - [ ] Estágio 2 (Runtime): imagem enxuta contendo apenas o JRE necessário para rodar
+
+### Requisitos detalhados
+
+- [ ] Automação e pipeline de CI/CD
+- [ ] Monitoramento local (Prometheus)
+- [ ] Observabilidade e dashboards (Grafana)
+- [ ] Gestão centralizada de logs (Graylog)
+- [ ] Orquestração única (`docker-compose.yml`)
+
+### Entregáveis
+
+- [x] Código-fonte da aplicação Java Spring
+- [ ] `Dockerfile` configurado com Multistage Build
+- [ ] `docker-compose.yml` orquestrando toda a stack (App + Prometheus + Grafana + Graylog + bancos)
+- [ ] Configurações da pipeline em `.github/workflows`
+- [ ] Arquivos de configuração do Prometheus, Grafana e Logback/GELF
+- [ ] README completo com:
+  - [ ] Instruções claras de como rodar o projeto
+  - [ ] Prints/evidências da pipeline CI/CD rodando com sucesso
+  - [ ] Prints dos dashboards do Grafana exibindo os gráficos
+  - [ ] Prints dos logs da aplicação sendo exibidos no Graylog
+
 ## Pré-requisitos
 
 - JDK 21+ (`java -version`)
@@ -115,6 +152,3 @@ com.betman
 ├── user/  wallet/  event/  odds/  bet/  settlement/  simulation/  admin/  stats/
 └── resources/static  # index.html, css/betman.css, js/api.js, js/app.js
 ```
-=======
-# betman 
->>>>>>> a85144dfd7af0a6354c4a5efaacdcabc4c71650c
