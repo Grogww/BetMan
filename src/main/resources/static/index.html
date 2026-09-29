@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>BetMan — Apostas fictícias</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='15' fill='%23FFD60A'/%3E%3Ccircle cx='16' cy='16' r='11' fill='none' stroke='%230B0B0C' stroke-width='2' stroke-dasharray='4 3'/%3E%3Ctext x='16' y='22' text-anchor='middle' font-family='Arial Black,Arial,sans-serif' font-weight='900' font-size='17' fill='%230B0B0C'%3EB%3C/text%3E%3C/svg%3E">
+  <link rel="stylesheet" href="/css/betman.css">
+</head>
+<body>
+
+<header class="bm-header">
+  <a class="bm-logo" href="/" aria-label="BetMan">
+    <span class="bm-chip" aria-hidden="true">B</span>
+    <span class="bm-wordmark">BET<em>MAN</em></span>
+  </a>
+
+  <div class="bm-header-user">
+    <button id="btn-switch-user" class="bm-btn bm-btn-ghost" type="button" title="Trocar usuário">
+      <span class="bm-avatar" aria-hidden="true">?</span>
+      <span id="current-username">selecionar</span>
+      <span class="bm-muted">· trocar</span>
+    </button>
+    <div class="bm-balance">
+      <span class="bm-balance-label">Saldo</span>
+      <strong id="balance">R$ 0,00</strong>
+    </div>
+    <button id="btn-deposit" class="bm-btn bm-btn-primary" type="button">Depositar</button>
+    <button id="btn-withdraw" class="bm-btn bm-btn-secondary" type="button">Sacar</button>
+  </div>
+</header>
+
+<nav class="bm-tabs" aria-label="Seções">
+  <button class="bm-tab-btn active" data-tab="events" type="button">Eventos</button>
+  <button class="bm-tab-btn" data-tab="bets" type="button">Minhas apostas</button>
+  <button class="bm-tab-btn" data-tab="transactions" type="button">Extrato</button>
+  <button class="bm-tab-btn" data-tab="simulation" type="button">Simulação</button>
+</nav>
+
+<main class="bm-main">
+
+  <!-- ===== Eventos + cupom ===== -->
+  <section id="tab-events" class="bm-tab active">
+    <div class="bm-events">
+      <div class="bm-section-title">
+        <h2>Ao vivo</h2>
+        <span class="bm-live-badge">AO VIVO</span>
+      </div>
+      <div id="live-events" class="bm-event-grid">
+        <p class="bm-empty">Nenhum jogo em andamento agora.</p>
+      </div>
+
+      <div class="bm-section-title">
+        <h2>Próximos</h2>
+        <span id="upcoming-count" class="bm-muted"></span>
+      </div>
+      <div id="upcoming-events" class="bm-event-grid">
+        <p class="bm-empty">Carregando eventos…</p>
+      </div>
+    </div>
+
+    <aside id="bet-slip" class="bm-slip bm-slip-empty" aria-label="Cupom de aposta">
+      <div class="bm-slip-header">
+        <h3>Cupom de aposta</h3>
+        <button id="slip-clear" class="bm-btn bm-btn-link" type="button" hidden>limpar</button>
+      </div>
+      <div id="slip-empty" class="bm-slip-body">
+        <p class="bm-muted">Escolha 1, X ou 2 em um evento para montar sua aposta.</p>
+      </div>
+      <form id="slip-form" class="bm-slip-body" hidden>
+        <div class="bm-slip-event">
+          <div id="slip-match" class="bm-slip-match"></div>
+          <div class="bm-slip-selection">
+            <span id="slip-selection-label"></span>
+            <span id="slip-odd" class="bm-odd-tag"></span>
+          </div>
+        </div>
+        <label class="bm-field">
+          <span>Valor da aposta (R$)</span>
+          <input id="slip-stake" type="number" min="1" step="0.01" placeholder="25,00" inputmode="decimal" required>
+        </label>
+        <div class="bm-slip-quick">
+          <button type="button" data-stake="5">R$ 5</button>
+          <button type="button" data-stake="10">R$ 10</button>
+          <button type="button" data-stake="25">R$ 25</button>
+          <button type="button" data-stake="50">R$ 50</button>
+        </div>
+        <div class="bm-slip-return">
+          <span>Retorno potencial</span>
+          <strong id="slip-return">R$ 0,00</strong>
+        </div>
+        <button id="slip-submit" class="bm-btn bm-btn-primary bm-btn-block" type="submit">Apostar</button>
+      </form>
+    </aside>
+  </section>
+
+  <!-- ===== Minhas apostas ===== -->
+  <section id="tab-bets" class="bm-tab">
+    <div class="bm-section-title">
+      <h2>Minhas apostas</h2>
+      <div class="bm-filter" role="group" aria-label="Filtrar por status">
+        <button class="bm-filter-btn active" data-status="" type="button">Todas</button>
+        <button class="bm-filter-btn" data-status="PENDING" type="button">Pendentes</button>
+        <button class="bm-filter-btn" data-status="WON" type="button">Ganhas</button>
+        <button class="bm-filter-btn" data-status="LOST" type="button">Perdidas</button>
+      </div>
+    </div>
+    <div class="bm-table-wrap">
+      <table class="bm-table">
+        <thead>
+          <tr>
+            <th>Evento</th>
+            <th>Seleção</th>
+            <th class="num">Valor</th>
+            <th class="num">Odd</th>
+            <th class="num">Retorno</th>
+            <th>Status</th>
+            <th>Data</th>
+          </tr>
+        </thead>
+        <tbody id="bets-body">
+          <tr><td colspan="7" class="bm-empty">Carregando…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ===== Extrato ===== -->
+  <section id="tab-transactions" class="bm-tab">
+    <div class="bm-section-title">
+      <h2>Extrato da carteira</h2>
+      <button id="btn-refresh-transactions" class="bm-btn bm-btn-ghost" type="button">Atualizar</button>
+    </div>
+    <div class="bm-table-wrap">
+      <table class="bm-table">
+        <thead>
+          <tr>
+            <th>Data</th>
+            <th>Tipo</th>
+            <th>Ref.</th>
+            <th class="num">Valor</th>
+            <th class="num">Saldo após</th>
+          </tr>
+        </thead>
+        <tbody id="transactions-body">
+          <tr><td colspan="5" class="bm-empty">Carregando…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ===== Simulação ===== -->
+  <section id="tab-simulation" class="bm-tab">
+    <div class="bm-section-title">
+      <h2>Simulação</h2>
+      <button id="btn-refresh-stats" class="bm-btn bm-btn-ghost" type="button">Atualizar</button>
+    </div>
+
+    <div id="stats-cards" class="bm-stats">
+      <div class="bm-stat"><span class="bm-stat-label">Usuários</span><strong id="stat-users">–</strong></div>
+      <div class="bm-stat"><span class="bm-stat-label">Volume apostado</span><strong id="stat-staked">–</strong></div>
+      <div class="bm-stat"><span class="bm-stat-label">Total pago</span><strong id="stat-paid">–</strong></div>
+      <div class="bm-stat">
+        <span class="bm-stat-label">Apostas</span>
+        <strong id="stat-bets">–</strong>
+        <span id="stat-bets-detail" class="bm-stat-detail"></span>
+      </div>
+      <div class="bm-stat">
+        <span class="bm-stat-label">Eventos</span>
+        <strong id="stat-events">–</strong>
+        <span id="stat-events-detail" class="bm-stat-detail"></span>
+      </div>
+    </div>
+
+    <div class="bm-sim-grid">
+      <form id="create-event-form" class="bm-card">
+        <h3>Criar evento</h3>
+        <label class="bm-field">
+          <span>Time da casa</span>
+          <input name="homeTeam" type="text" maxlength="60" placeholder="Tubarões do Vale" required>
+        </label>
+        <label class="bm-field">
+          <span>Time visitante</span>
+          <input name="awayTeam" type="text" maxlength="60" placeholder="Leões da Serra" required>
+        </label>
+        <label class="bm-field">
+          <span>Começa em (minutos)</span>
+          <input name="minutes" type="number" min="0" step="1" value="3" required>
+        </label>
+        <div class="bm-field-row">
+          <label class="bm-field"><span>Odd 1</span><input name="oddHome" type="number" min="1.01" step="0.01" placeholder="auto"></label>
+          <label class="bm-field"><span>Odd X</span><input name="oddDraw" type="number" min="1.01" step="0.01" placeholder="auto"></label>
+          <label class="bm-field"><span>Odd 2</span><input name="oddAway" type="number" min="1.01" step="0.01" placeholder="auto"></label>
+        </div>
+        <p class="bm-muted bm-small">Deixe as odds em branco para gerar automaticamente.</p>
+        <button class="bm-btn bm-btn-primary" type="submit">Criar evento</button>
+      </form>
+
+      <div class="bm-card">
+        <h3>Forçar resultado</h3>
+        <p class="bm-muted bm-small">Finaliza o evento com o resultado escolhido e liquida as apostas pendentes.</p>
+        <div id="settle-list" class="bm-settle-list">
+          <p class="bm-empty">Nenhum evento aberto.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<!-- ===== Modal: seleção de usuário ===== -->
+<div id="modal-user" class="bm-modal" hidden>
+  <div class="bm-modal-box" role="dialog" aria-modal="true" aria-labelledby="modal-user-title">
+    <div class="bm-modal-logo">
+      <span class="bm-chip" aria-hidden="true">B</span>
+      <span class="bm-wordmark">BET<em>MAN</em></span>
+    </div>
+    <h2 id="modal-user-title">Quem está apostando?</h2>
+    <p class="bm-muted">Casa de apostas fictícia — sem dinheiro real.</p>
+
+    <div id="user-list" class="bm-user-list">
+      <p class="bm-empty">Carregando usuários…</p>
+    </div>
+
+    <form id="create-user-form" class="bm-create-user">
+      <label class="bm-field">
+        <span>Novo usuário</span>
+        <input id="new-username" type="text" placeholder="ex.: bruce_wayne" minlength="3" maxlength="30" pattern="[a-zA-Z0-9_]{3,30}" autocomplete="off" required>
+      </label>
+      <button class="bm-btn bm-btn-primary" type="submit">Criar e entrar</button>
+      <p class="bm-muted bm-small">3 a 30 caracteres: letras, números ou _. Você ganha um bônus de boas-vindas.</p>
+    </form>
+    <button id="modal-user-close" class="bm-btn bm-btn-ghost bm-modal-close" type="button" hidden>Cancelar</button>
+  </div>
+</div>
+
+<!-- ===== Modal: depósito / saque ===== -->
+<div id="modal-amount" class="bm-modal" hidden>
+  <div class="bm-modal-box bm-modal-small" role="dialog" aria-modal="true" aria-labelledby="modal-amount-title">
+    <h2 id="modal-amount-title">Depositar</h2>
+    <p id="modal-amount-hint" class="bm-muted bm-small"></p>
+    <form id="amount-form">
+      <label class="bm-field">
+        <span>Valor (R$)</span>
+        <input id="amount-input" type="number" min="0.01" step="0.01" inputmode="decimal" placeholder="50,00" required>
+      </label>
+      <div class="bm-modal-actions">
+        <button type="button" class="bm-btn bm-btn-ghost" data-close>Cancelar</button>
+        <button id="amount-submit" type="submit" class="bm-btn bm-btn-primary">Confirmar</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ===== Modal: odds ao vivo ===== -->
+<div id="modal-live-odds" class="bm-modal" hidden>
+  <div class="bm-modal-box bm-modal-small" role="dialog" aria-modal="true" aria-labelledby="modal-live-title">
+    <h2 id="modal-live-title">Odds ao vivo</h2>
+    <p id="live-odds-match" class="bm-muted"></p>
+    <div id="live-odds-body" class="bm-live-odds"></div>
+    <div class="bm-modal-actions">
+      <button type="button" class="bm-btn bm-btn-ghost" data-close>Fechar</button>
+      <button id="live-odds-retry" type="button" class="bm-btn bm-btn-primary">Consultar de novo</button>
+    </div>
+  </div>
+</div>
+
+<div id="toasts" class="bm-toasts" aria-live="polite"></div>
+
+<template id="tpl-event-card">
+  <article class="bm-event">
+    <div class="bm-event-top">
+      <span class="bm-event-status"></span>
+      <span class="bm-event-countdown"></span>
+    </div>
+    <div class="bm-event-teams">
+      <span class="bm-team home"></span>
+      <span class="bm-vs">×</span>
+      <span class="bm-team away"></span>
+    </div>
+    <div class="bm-odds">
+      <button type="button" class="bm-odd-btn" data-selection="HOME"><small>1</small><span class="odd"></span></button>
+      <button type="button" class="bm-odd-btn" data-selection="DRAW"><small>X</small><span class="odd"></span></button>
+      <button type="button" class="bm-odd-btn" data-selection="AWAY"><small>2</small><span class="odd"></span></button>
+    </div>
+    <button type="button" class="bm-btn bm-btn-link bm-live-odds-btn">Odds ao vivo</button>
+  </article>
+</template>
+
+<script src="/js/api.js"></script>
+<script src="/js/app.js"></script>
+</body>
+</html>

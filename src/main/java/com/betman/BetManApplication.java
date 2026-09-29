@@ -4,10 +4,10 @@ import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
 @SpringBootApplication
-public class BetmanApplication {
+public class BetManApplication {
 
 	public static void main(String[] args) {
-		SpringApplication.run(BetmanApplication.class, args);
+		SpringApplication.run(BetManApplication.class, args);
 	}
 
 }
