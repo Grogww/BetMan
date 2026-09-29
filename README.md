@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # 🦇 BetMan
 
 Casa de apostas **fictícia** (sem dinheiro real) usada como artefato base do projeto final de DevOps.
@@ -115,3 +116,6 @@ com.betman
 ├── user/  wallet/  event/  odds/  bet/  settlement/  simulation/  admin/  stats/
 └── resources/static  # index.html, css/betman.css, js/api.js, js/app.js
 ```
+=======
+# betman 
+>>>>>>> a85144dfd7af0a6354c4a5efaacdcabc4c71650c
