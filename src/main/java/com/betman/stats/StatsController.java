@@ -1,0 +1,22 @@
+package com.betman.stats;
+
+import com.betman.stats.dto.StatsSummaryResponse;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+@RequestMapping("/api/stats")
+public class StatsController {
+
+	private final StatsService statsService;
+
+	public StatsController(StatsService statsService) {
+		this.statsService = statsService;
+	}
+
+	@GetMapping("/summary")
+	public StatsSummaryResponse summary() {
+		return statsService.summary();
+	}
+}
