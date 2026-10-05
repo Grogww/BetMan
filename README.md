@@ -106,6 +106,45 @@ curl -s localhost:8080/api/stats/summary
 Erros seguem RFC 9457 (`application/problem+json`) com `errorCode` e `requestId`; o mesmo id
 volta no header `X-Request-Id` e aparece nos logs como `req=`.
 
+## Como rodar com Docker
+
+> **Rascunho:** o `docker-compose.yml` ainda será criado; esta seção descreve o fluxo esperado.
+
+Pré-requisito: Docker com Compose v2 (`docker compose version`). Não é preciso ter JDK nem
+PostgreSQL instalados.
+
+```bash
+cp .env.example .env            # PowerShell: Copy-Item .env.example .env
+docker compose up -d --build
+```
+
+O `--build` gera a imagem pelo Dockerfile multistage, o compose sobe o PostgreSQL e a aplicação,
+e o `-d` deixa tudo rodando em segundo plano. O Flyway cria as tabelas e os dados de demonstração
+na primeira subida.
+
+Quando `docker compose ps` mostrar o app como `healthy`, abra <http://localhost:8080>
+(ou a porta definida em `APP_PORT`).
+
+| Variável | Exemplo | Uso |
+|---|---|---|
+| `DB_NAME` | `betman` | nome do banco criado pelo Postgres |
+| `DB_USERNAME` | `betman` | usuário do banco |
+| `DB_PASSWORD` | `betman` | senha do banco |
+| `DB_URL` | `jdbc:postgresql://db:5432/betman` | URL JDBC; o host é o serviço `db` |
+| `APP_PORT` | `8080` | porta do app no seu computador |
+| `DB_PORT` | `5432` | porta do Postgres no seu computador |
+| `SERVER_PORT` | `8080` | porta interna do container (mantenha 8080) |
+| `BETMAN_LOG_LEVEL` | `DEBUG` | nível de log do pacote `com.betman` |
+| `BETMAN_SIMULATION_ENABLED` | `true` | liga/desliga a simulação de eventos |
+
+Comandos úteis:
+
+```bash
+docker compose logs -f app      # acompanha os logs da aplicação
+docker compose down             # para e remove os containers (os dados do banco ficam)
+docker compose down -v          # para e remove tudo, inclusive os dados do banco
+```
+
 ## Como testar
 
 ```bash
