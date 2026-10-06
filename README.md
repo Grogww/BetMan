@@ -108,8 +108,6 @@ volta no header `X-Request-Id` e aparece nos logs como `req=`.
 
 ## Como rodar com Docker
 
-> **Rascunho:** o `docker-compose.yml` ainda será criado; esta seção descreve o fluxo esperado.
-
 Pré-requisito: Docker com Compose v2 (`docker compose version`). Não é preciso ter JDK nem
 PostgreSQL instalados.
 
@@ -132,7 +130,7 @@ Quando `docker compose ps` mostrar o app como `healthy`, abra <http://localhost:
 | `DB_PASSWORD` | `betman` | senha do banco |
 | `DB_URL` | `jdbc:postgresql://db:5432/betman` | URL JDBC; o host é o serviço `db` |
 | `APP_PORT` | `8080` | porta do app no seu computador |
-| `DB_PORT` | `5432` | porta do Postgres no seu computador |
+| `DB_PORT` | `5433` | porta do Postgres no seu computador (5433 evita conflito com um Postgres local) |
 | `SERVER_PORT` | `8080` | porta interna do container (mantenha 8080) |
 | `BETMAN_LOG_LEVEL` | `DEBUG` | nível de log do pacote `com.betman` |
 | `BETMAN_SIMULATION_ENABLED` | `true` | liga/desliga a simulação de eventos |
