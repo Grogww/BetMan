@@ -163,6 +163,22 @@ Os testes (unitários com JUnit 5 + Mockito + AssertJ e de controller com `@WebM
 **não dependem de PostgreSQL nem de Docker**: usam `Clock.fixed(...)`, `RandomGenerator` com seed
 fixa e `@MockitoBean`.
 
+### Validação do Dockerfile e do compose
+
+O job `lint` da pipeline roda, em paralelo com os testes:
+
+- **hadolint** no `Dockerfile` (boas práticas e ShellCheck nos `RUN`); avisos `warning` ou
+  `error` falham o job, conforme `.hadolint.yaml`;
+- **`docker compose config`** com o `.env.example`, garantindo que o compose é válido e que o
+  exemplo tem todas as variáveis obrigatórias.
+
+Para rodar localmente:
+
+```bash
+docker run --rm -i -v "$PWD/.hadolint.yaml:/.config/hadolint.yaml" hadolint/hadolint < Dockerfile
+docker compose --env-file .env.example config --quiet
+```
+
 ## Decisões registradas
 
 - **Projeto na raiz do repositório.** A especificação menciona `app/`, mas o Initializr gerou o

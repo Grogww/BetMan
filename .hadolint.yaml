@@ -1,0 +1,3 @@
+# Hadolint config, read by the CI and by local runs.
+# warning and error fail the pipeline; info and style only show up in the log.
+failure-threshold: warning
