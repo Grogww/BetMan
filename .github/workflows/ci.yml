@@ -1,4 +1,4 @@
-# Builds and tests every PR to main and every push to main.
+# Builds, tests and lints (Dockerfile + compose) every PR to main and every push to main.
 # Pushes to main also publish the Docker image to GHCR.
 name: CI
 
@@ -47,10 +47,30 @@ jobs:
           retention-days: 7
           if-no-files-found: warn
 
-  # Delivery: only after a merge to main, and only if the tests passed
+  # Static checks: no build, no tests; runs in parallel with build
+  lint:
+    name: lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      # Reads .hadolint.yaml from the repo root
+      - name: Hadolint no Dockerfile
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: Dockerfile
+
+      # .env.example supplies the required variables (DB_PASSWORD) that CI doesn't have
+      - name: Validar docker-compose.yml
+        run: docker compose --env-file .env.example config --quiet
+
+  # Delivery: only after a merge to main, and only if tests and lint passed
   publish-image:
     name: publish-image
-    needs: build
+    needs: [build, lint]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 20

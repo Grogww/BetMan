@@ -23,9 +23,10 @@ USER spring
 
 EXPOSE 8080
 
-# Readiness includes the database, so "healthy" means ready to serve requests
+# Readiness includes the database, so "healthy" means ready to serve requests.
+# sh -c expands SERVER_PORT at runtime (exec form alone doesn't expand variables)
 HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
-    CMD wget -q -O /dev/null "http://localhost:${SERVER_PORT:-8080}/actuator/health/readiness" || exit 1
+    CMD ["sh", "-c", "wget -q -O /dev/null http://localhost:${SERVER_PORT:-8080}/actuator/health/readiness || exit 1"]
 
 # Size the heap from the container memory limit instead of the host's RAM
 ENTRYPOINT ["java", "-XX:MaxRAMPercentage=75.0", "-jar", "app.jar"]
