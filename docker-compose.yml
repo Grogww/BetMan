@@ -24,9 +24,10 @@ services:
       retries: 5
       start_period: 10s
 
+  # Uses the image published by the CI; builds from source only if it can't be pulled or with --build
   app:
+    image: ${BETMAN_IMAGE:-ghcr.io/grogww/betman:latest}
     build: .
-    image: betman:latest
     container_name: betman-app
     restart: unless-stopped
     environment:

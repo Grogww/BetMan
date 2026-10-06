@@ -113,12 +113,21 @@ PostgreSQL instalados.
 
 ```bash
 cp .env.example .env            # PowerShell: Copy-Item .env.example .env
-docker compose up -d --build
+docker compose up -d
 ```
 
-O `--build` gera a imagem pelo Dockerfile multistage, o compose sobe o PostgreSQL e a aplicação,
-e o `-d` deixa tudo rodando em segundo plano. O Flyway cria as tabelas e os dados de demonstração
-na primeira subida.
+O compose usa a imagem publicada pela pipeline em `ghcr.io/grogww/betman` (baixada na primeira
+vez), sobe o PostgreSQL e a aplicação, e o `-d` deixa tudo rodando em segundo plano. O Flyway cria
+as tabelas e os dados de demonstração na primeira subida.
+
+| Objetivo | Comando |
+|---|---|
+| Rodar a imagem publicada | `docker compose up -d` |
+| Atualizar para a última versão da `main` | `docker compose pull && docker compose up -d` |
+| Rodar o código local (gera a imagem pelo Dockerfile multistage) | `docker compose up -d --build` |
+
+Cada merge na `main` publica duas tags: `latest` e o sha curto do commit (ex.: `a1b2c3d`). Para
+fixar uma versão, defina `BETMAN_IMAGE=ghcr.io/grogww/betman:<sha>` no `.env`.
 
 Quando `docker compose ps` mostrar o app como `healthy`, abra <http://localhost:8080>
 (ou a porta definida em `APP_PORT`).
@@ -134,6 +143,7 @@ Quando `docker compose ps` mostrar o app como `healthy`, abra <http://localhost:
 | `SERVER_PORT` | `8080` | porta interna do container (mantenha 8080) |
 | `BETMAN_LOG_LEVEL` | `DEBUG` | nível de log do pacote `com.betman` |
 | `BETMAN_SIMULATION_ENABLED` | `true` | liga/desliga a simulação de eventos |
+| `BETMAN_IMAGE` | `ghcr.io/grogww/betman:latest` | imagem da aplicação usada pelo compose |
 
 Comandos úteis:
 
