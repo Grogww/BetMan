@@ -1,4 +1,5 @@
 # 🦇 BetMan
+[![CI/CD](https://github.com/Grogww/BetMan/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Grogww/BetMan/actions/workflows/ci.yml)
 
 Casa de apostas **fictícia** (sem dinheiro real) usada como artefato base do projeto final de DevOps.
 A aplicação gera tráfego, erros e logs realistas para a esteira CI/CD e a stack de observabilidade
