@@ -102,6 +102,84 @@ services:
       retries: 3
       start_period: 30s
 
+    # Stores only Graylog metadata (users, inputs, streams), not the logs
+  mongodb:
+    image: mongo:7.0.14
+    container_name: betman-mongodb
+    restart: unless-stopped
+    mem_limit: 512m
+    volumes:
+      - mongo-data:/data/db
+    networks:
+      - betman-net
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+    # Stores and indexes the log messages written by Graylog
+  opensearch:
+    image: opensearchproject/opensearch:2.15.0
+    container_name: betman-opensearch
+    restart: unless-stopped
+    mem_limit: 1536m
+    environment:
+      discovery.type: single-node
+      bootstrap.memory_lock: "false"
+      action.auto_create_index: "false"
+      plugins.security.disabled: "true"
+      DISABLE_INSTALL_DEMO_CONFIG: "true"
+      OPENSEARCH_JAVA_OPTS: -Xms512m -Xmx512m
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+    volumes:
+      - opensearch-data:/usr/share/opensearch/data
+    networks:
+      - betman-net
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fs http://localhost:9200/_cluster/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
+
+  graylog:
+    image: graylog/graylog:6.1.4
+    container_name: betman-graylog
+    restart: unless-stopped
+    mem_limit: 1536m
+    environment:
+      GRAYLOG_ROOT_USERNAME: ${GRAYLOG_ROOT_USERNAME:-admin}
+      GRAYLOG_PASSWORD_SECRET: ${GRAYLOG_PASSWORD_SECRET:?defina GRAYLOG_PASSWORD_SECRET no .env}
+      GRAYLOG_ROOT_PASSWORD_SHA2: ${GRAYLOG_ROOT_PASSWORD_SHA2:?defina GRAYLOG_ROOT_PASSWORD_SHA2 no .env}
+      GRAYLOG_HTTP_BIND_ADDRESS: 0.0.0.0:9000
+      GRAYLOG_HTTP_EXTERNAL_URI: http://localhost:${GRAYLOG_PORT:-9000}/
+      GRAYLOG_ELASTICSEARCH_HOSTS: http://opensearch:9200
+      GRAYLOG_MONGODB_URI: mongodb://mongodb:27017/graylog
+      GRAYLOG_SERVER_JAVA_OPTS: -Xms512m -Xmx512m
+    volumes:
+      - graylog-data:/usr/share/graylog/data
+    ports:
+      - "${GRAYLOG_PORT:-9000}:9000"
+      - "${GRAYLOG_GELF_PORT:-12201}:12201/udp"
+    networks:
+      - betman-net
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      opensearch:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fs http://localhost:9000/api/system/lbstatus || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+
 networks:
   betman-net:
     name: betman-net
@@ -113,3 +191,9 @@ volumes:
     name: betman-prometheus-data
   grafana-data:
     name: betman-grafana-data
+  mongo-data:
+    name: betman-mongo-data
+  opensearch-data:
+    name: betman-opensearch-data
+  graylog-data:
+    name: betman-graylog-data
