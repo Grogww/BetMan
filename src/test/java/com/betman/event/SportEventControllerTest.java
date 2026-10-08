@@ -11,6 +11,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.betman.common.web.PageResponse;
 import com.betman.event.dto.SportEventResponse;
+import com.betman.support.MetricsTestConfiguration;
 import com.betman.user.UserService;
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -19,10 +20,12 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.data.domain.Pageable;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
+@Import(MetricsTestConfiguration.class)
 @WebMvcTest(SportEventController.class)
 class SportEventControllerTest {
 

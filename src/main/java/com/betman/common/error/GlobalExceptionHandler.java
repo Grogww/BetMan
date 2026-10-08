@@ -1,6 +1,7 @@
 package com.betman.common.error;
 
 import com.betman.common.web.RequestContextFilter;
+import io.micrometer.core.instrument.MeterRegistry;
 import java.util.List;
 import lombok.extern.slf4j.Slf4j;
 import org.slf4j.MDC;
@@ -28,6 +29,13 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 	static final String ERROR_CODE = "errorCode";
 	static final String REQUEST_ID = "requestId";
 	static final String ERRORS = "errors";
+	static final String ERRORS_METRIC = "betman.errors";
+
+	private final MeterRegistry meterRegistry;
+
+	public GlobalExceptionHandler(MeterRegistry meterRegistry) {
+		this.meterRegistry = meterRegistry;
+	}
 
 	@ExceptionHandler(BetManException.class)
 	public ProblemDetail handleBusiness(BetManException ex) {
@@ -101,16 +109,24 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 			problem.setProperty(ERROR_CODE, status != null ? status.name() : "HTTP_" + statusCode.value());
 		}
 		problem.setProperty(REQUEST_ID, MDC.get(RequestContextFilter.REQUEST_ID));
-		log.warn("Request failed errorCode={} status={} detail={}", problem.getProperties().get(ERROR_CODE),
-				statusCode.value(), problem.getDetail());
+		String errorCode = String.valueOf(problem.getProperties().get(ERROR_CODE));
+		countError(errorCode);
+		log.warn("Request failed errorCode={} status={} detail={}", errorCode, statusCode.value(),
+				problem.getDetail());
 		return new ResponseEntity<>(problem, headers, statusCode);
 	}
 
-	private static ProblemDetail problem(HttpStatus status, ErrorCode code, String title, String detail) {
+	/** Every handler except {@link #handleExceptionInternal} builds its response here. */
+	private ProblemDetail problem(HttpStatus status, ErrorCode code, String title, String detail) {
 		ProblemDetail problem = ProblemDetail.forStatusAndDetail(status, detail);
 		problem.setTitle(title);
 		problem.setProperty(ERROR_CODE, code.name());
 		problem.setProperty(REQUEST_ID, MDC.get(RequestContextFilter.REQUEST_ID));
+		countError(code.name());
 		return problem;
+	}
+
+	private void countError(String errorCode) {
+		meterRegistry.counter(ERRORS_METRIC, ERROR_CODE, errorCode).increment();
 	}
 }

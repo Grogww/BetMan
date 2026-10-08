@@ -22,6 +22,8 @@ import com.betman.event.Sport;
 import com.betman.event.SportEvent;
 import com.betman.event.SportEventService;
 import com.betman.wallet.WalletService;
+import io.micrometer.core.instrument.DistributionSummary;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
@@ -49,6 +51,8 @@ class BetServiceTest {
 	@Mock
 	private WalletService walletService;
 
+	private final SimpleMeterRegistry registry = new SimpleMeterRegistry();
+
 	private BetService service;
 
 	private SportEvent event;
@@ -57,7 +61,8 @@ class BetServiceTest {
 	void setUp() {
 		LimitsProperties limits = new LimitsProperties(bd("1.00"), bd("10000.00"), bd("10.00"), bd("50000.00"),
 				bd("10.00"), bd("100.00"));
-		service = new BetService(betRepository, eventService, walletService, limits, Clock.fixed(NOW, ZoneOffset.UTC));
+		service = new BetService(betRepository, eventService, walletService, limits, Clock.fixed(NOW, ZoneOffset.UTC),
+				registry);
 		event = SportEvent.builder().id(12L).sport(Sport.FOOTBALL).homeTeam("Tubarões do Vale")
 				.awayTeam("Leões da Serra").startsAt(NOW.plusSeconds(300)).status(EventStatus.SCHEDULED)
 				.oddHome(bd("2.15")).oddDraw(bd("3.30")).oddAway(bd("3.10")).createdAt(NOW).build();
@@ -93,6 +98,35 @@ class BetServiceTest {
 		assertThat(saved.getValue().getUserId()).isEqualTo(USER_ID);
 		assertThat(saved.getValue().getOdd()).isEqualByComparingTo("2.15");
 		verify(walletService).debitStake(USER_ID, bd("25.00"), 87L);
+	}
+
+	@Test
+	void placedBetIsCountedBySportAndRecordsItsStake() {
+		when(eventService.getOrThrow(12L)).thenReturn(event);
+		when(walletService.getBalance(USER_ID)).thenReturn(bd("1000.00"));
+		when(betRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+		when(walletService.debitStake(any(), any(), any())).thenReturn(bd("0.00"));
+
+		service.place(USER_ID, new PlaceBetRequest(12L, Outcome.HOME, bd("25.00")));
+		service.place(USER_ID, new PlaceBetRequest(12L, Outcome.AWAY, bd("10.50")));
+
+		assertThat(registry.get(BetService.BETS_PLACED).tag("sport", "FOOTBALL").counter().count()).isEqualTo(2.0);
+		DistributionSummary stake = registry.get(BetService.BETS_STAKE).tag("sport", "FOOTBALL").summary();
+		assertThat(stake.count()).isEqualTo(2);
+		assertThat(stake.totalAmount()).isEqualTo(35.50);
+		assertThat(stake.max()).isEqualTo(25.00);
+	}
+
+	@Test
+	void rejectedBetIsNotCounted() {
+		when(eventService.getOrThrow(12L)).thenReturn(event);
+		when(walletService.getBalance(USER_ID)).thenReturn(bd("10.00"));
+
+		assertThatThrownBy(() -> service.place(USER_ID, new PlaceBetRequest(12L, Outcome.HOME, bd("25.00"))))
+				.isInstanceOf(InsufficientBalanceException.class);
+
+		assertThat(registry.find(BetService.BETS_PLACED).counter()).isNull();
+		assertThat(registry.find(BetService.BETS_STAKE).summary()).isNull();
 	}
 
 	@Test
