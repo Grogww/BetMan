@@ -18,6 +18,7 @@ import com.betman.common.error.EventNotOpenException;
 import com.betman.common.error.InsufficientBalanceException;
 import com.betman.common.error.NotFoundException;
 import com.betman.event.Outcome;
+import com.betman.support.MetricsTestConfiguration;
 import com.betman.user.UserService;
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -25,10 +26,12 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
+@Import(MetricsTestConfiguration.class)
 @WebMvcTest(BetController.class)
 class BetControllerTest {
 

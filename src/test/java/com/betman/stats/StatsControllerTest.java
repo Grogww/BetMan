@@ -8,15 +8,18 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.betman.bet.BetStatus;
 import com.betman.event.EventStatus;
 import com.betman.stats.dto.StatsSummaryResponse;
+import com.betman.support.MetricsTestConfiguration;
 import com.betman.user.UserService;
 import java.math.BigDecimal;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
+@Import(MetricsTestConfiguration.class)
 @WebMvcTest(StatsController.class)
 class StatsControllerTest {
 

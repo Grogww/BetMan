@@ -10,9 +10,12 @@ import com.betman.common.money.Money;
 import com.betman.common.web.PageResponse;
 import com.betman.config.LimitsProperties;
 import com.betman.event.EventStatus;
+import com.betman.event.Sport;
 import com.betman.event.SportEvent;
 import com.betman.event.SportEventService;
 import com.betman.wallet.WalletService;
+import io.micrometer.core.instrument.DistributionSummary;
+import io.micrometer.core.instrument.MeterRegistry;
 import java.math.BigDecimal;
 import java.time.Clock;
 import java.util.List;
@@ -24,24 +27,31 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 @Slf4j
 @Service
 public class BetService {
+
+	static final String BETS_PLACED = "betman.bets.placed";
+	static final String BETS_STAKE = "betman.bets.stake";
 
 	private final BetRepository betRepository;
 	private final SportEventService eventService;
 	private final WalletService walletService;
 	private final LimitsProperties limits;
 	private final Clock clock;
+	private final MeterRegistry meterRegistry;
 
 	public BetService(BetRepository betRepository, SportEventService eventService, WalletService walletService,
-			LimitsProperties limits, Clock clock) {
+			LimitsProperties limits, Clock clock, MeterRegistry meterRegistry) {
 		this.betRepository = betRepository;
 		this.eventService = eventService;
 		this.walletService = walletService;
 		this.limits = limits;
 		this.clock = clock;
+		this.meterRegistry = meterRegistry;
 	}
 
 	/**
@@ -83,7 +93,35 @@ public class BetService {
 
 		log.info("Bet placed betId={} userId={} eventId={} selection={} stake={} odd={} potentialPayout={} balance={}",
 				bet.getId(), userId, event.getId(), bet.getSelection(), stake, odd, potentialPayout, balanceAfter);
+		recordPlacedBet(event.getSport(), stake);
 		return BetResponse.from(bet, event, balanceAfter);
+	}
+
+	/**
+	 * Counts the bet and its stake only after the transaction commits, so a rollback (e.g. a
+	 * concurrent update on the wallet) does not inflate the metrics. Without a transaction
+	 * (unit tests) the metrics are recorded right away.
+	 */
+	private void recordPlacedBet(Sport sport, BigDecimal stake) {
+		Runnable record = () -> {
+			meterRegistry.counter(BETS_PLACED, "sport", sport.name()).increment();
+			DistributionSummary.builder(BETS_STAKE)
+					.description("Valor apostado por aposta criada")
+					.baseUnit("BRL")
+					.tag("sport", sport.name())
+					.register(meterRegistry)
+					.record(stake.doubleValue());
+		};
+		if (TransactionSynchronizationManager.isSynchronizationActive()) {
+			TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+				@Override
+				public void afterCommit() {
+					record.run();
+				}
+			});
+		} else {
+			record.run();
+		}
 	}
 
 	@Transactional(readOnly = true)
