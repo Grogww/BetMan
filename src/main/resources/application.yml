@@ -23,6 +23,7 @@ server:
     include-stacktrace: never
 
 management:
+  management:
   endpoints:
     web:
       exposure:
@@ -45,6 +46,9 @@ management:
   metrics:
     tags:
       application: ${spring.application.name}
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
 
 info:
   app:
