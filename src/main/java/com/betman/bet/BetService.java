@@ -14,6 +14,7 @@ import com.betman.event.Sport;
 import com.betman.event.SportEvent;
 import com.betman.event.SportEventService;
 import com.betman.wallet.WalletService;
+import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.DistributionSummary;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.math.BigDecimal;
@@ -52,6 +53,11 @@ public class BetService {
 		this.limits = limits;
 		this.clock = clock;
 		this.meterRegistry = meterRegistry;
+		// Series start at zero so increase()/rate() in Prometheus also see the first bet.
+		for (Sport sport : Sport.values()) {
+			placedCounter(sport);
+			stakeSummary(sport);
+		}
 	}
 
 	/**
@@ -104,13 +110,8 @@ public class BetService {
 	 */
 	private void recordPlacedBet(Sport sport, BigDecimal stake) {
 		Runnable record = () -> {
-			meterRegistry.counter(BETS_PLACED, "sport", sport.name()).increment();
-			DistributionSummary.builder(BETS_STAKE)
-					.description("Valor apostado por aposta criada")
-					.baseUnit("BRL")
-					.tag("sport", sport.name())
-					.register(meterRegistry)
-					.record(stake.doubleValue());
+			placedCounter(sport).increment();
+			stakeSummary(sport).record(stake.doubleValue());
 		};
 		if (TransactionSynchronizationManager.isSynchronizationActive()) {
 			TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
@@ -122,6 +123,18 @@ public class BetService {
 		} else {
 			record.run();
 		}
+	}
+
+	private Counter placedCounter(Sport sport) {
+		return meterRegistry.counter(BETS_PLACED, "sport", sport.name());
+	}
+
+	private DistributionSummary stakeSummary(Sport sport) {
+		return DistributionSummary.builder(BETS_STAKE)
+				.description("Valor apostado por aposta criada")
+				.baseUnit("BRL")
+				.tag("sport", sport.name())
+				.register(meterRegistry);
 	}
 
 	@Transactional(readOnly = true)

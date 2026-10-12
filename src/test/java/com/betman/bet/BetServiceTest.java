@@ -125,8 +125,8 @@ class BetServiceTest {
 		assertThatThrownBy(() -> service.place(USER_ID, new PlaceBetRequest(12L, Outcome.HOME, bd("25.00"))))
 				.isInstanceOf(InsufficientBalanceException.class);
 
-		assertThat(registry.find(BetService.BETS_PLACED).counter()).isNull();
-		assertThat(registry.find(BetService.BETS_STAKE).summary()).isNull();
+		assertThat(registry.get(BetService.BETS_PLACED).tag("sport", "FOOTBALL").counter().count()).isZero();
+		assertThat(registry.get(BetService.BETS_STAKE).tag("sport", "FOOTBALL").summary().count()).isZero();
 	}
 
 	@Test
