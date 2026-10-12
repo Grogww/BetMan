@@ -35,6 +35,11 @@ services:
       SERVER_PORT: ${SERVER_PORT:-8080}
       BETMAN_LOG_LEVEL: ${BETMAN_LOG_LEVEL:-DEBUG}
       BETMAN_SIMULATION_ENABLED: ${BETMAN_SIMULATION_ENABLED:-true}
+      # "docker" profile turns on the GELF appender in logback-spring.xml
+      SPRING_PROFILES_ACTIVE: docker
+      GRAYLOG_HOST: graylog
+      # Container port on betman-net; ${GRAYLOG_GELF_PORT} in .env is only the port published on the host
+      GRAYLOG_GELF_PORT: 12201
     ports:
       - "${APP_PORT:-8080}:${SERVER_PORT:-8080}"
     networks:
