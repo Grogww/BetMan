@@ -63,6 +63,10 @@ logging:
     level: "%5p [req=%X{requestId:-} user=%X{userId:-}]"
 
 betman:
+  # GELF destination, used only by the "docker" profile in logback-spring.xml
+  graylog:
+    host: ${GRAYLOG_HOST:graylog}
+    port: ${GRAYLOG_GELF_PORT:12201}
   simulation:
     enabled: ${BETMAN_SIMULATION_ENABLED:true}
     min-scheduled-events: 8

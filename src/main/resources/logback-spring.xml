@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+
+	<!-- Spring Boot defaults: CONSOLE_LOG_PATTERN, honoring logging.pattern.* from application.yml -->
+	<include resource="org/springframework/boot/logging/logback/defaults.xml"/>
+	<include resource="org/springframework/boot/logging/logback/console-appender.xml"/>
+
+	<springProfile name="!docker">
+		<root level="INFO">
+			<appender-ref ref="CONSOLE"/>
+		</root>
+	</springProfile>
+
+	<springProfile name="docker">
+		<springProperty scope="context" name="GRAYLOG_HOST" source="betman.graylog.host" defaultValue="graylog"/>
+		<springProperty scope="context" name="GRAYLOG_PORT" source="betman.graylog.port" defaultValue="12201"/>
+
+		<appender name="GELF" class="de.siegmar.logbackgelf.GelfUdpAppender">
+			<graylogHost>${GRAYLOG_HOST}</graylogHost>
+			<graylogPort>${GRAYLOG_PORT}</graylogPort>
+			<encoder class="de.siegmar.logbackgelf.GelfEncoder">
+				<!-- MDC carries requestId and userId (see RequestContextFilter) -->
+				<includeMdcData>true</includeMdcData>
+				<includeCallerData>false</includeCallerData>
+				<includeRootCauseData>true</includeRootCauseData>
+				<includeLevelName>true</includeLevelName>
+				<!-- Keeps field types stable in OpenSearch (e.g. userId "42" stays a string) -->
+				<numbersAsString>true</numbersAsString>
+				<staticField>app:betman</staticField>
+			</encoder>
+		</appender>
+
+		<!-- Sending logs must never block a request: drop events if the queue fills up -->
+		<appender name="ASYNC_GELF" class="ch.qos.logback.classic.AsyncAppender">
+			<appender-ref ref="GELF"/>
+			<neverBlock>true</neverBlock>
+		</appender>
+
+		<root level="INFO">
+			<appender-ref ref="CONSOLE"/>
+			<appender-ref ref="ASYNC_GELF"/>
+		</root>
+	</springProfile>
+
+</configuration>
