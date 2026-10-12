@@ -30,8 +30,16 @@ Todas as métricas do app têm a tag `application="betman"`. As queries HTTP exc
 | Ticket médio | `sum(rate(betman_bets_stake_BRL_sum[5m])) / sum(rate(betman_bets_stake_BRL_count[5m]))` | R$ |
 | Erros de negócio por código | `sum by (errorCode) (rate(betman_errors_total[5m])) * 60` | erros/min |
 | Falhas do provedor de odds | `sum(rate(betman_odds_provider_failures_total[5m])) * 60` | falhas/min |
+| Taxa de falha do provedor de odds | `sum(rate(betman_odds_provider_latency_seconds_count{outcome="failure"}[5m])) / sum(rate(betman_odds_provider_latency_seconds_count[5m]))` | % |
+| Valor apostado no período | `sum(increase(betman_bets_stake_BRL_sum[$__range]))` | R$ |
+| Apostas ganhas × perdidas | `sum by (result) (increase(betman_bets_settled_total[$__range]))` | apostas |
+| Prêmios pagos no período | `sum(increase(betman_bets_payout_BRL_sum[$__range]))` | R$ |
+| Taxa de acerto | `sum(increase(betman_bets_settled_total{result="WON"}[$__range])) / sum(increase(betman_bets_settled_total[$__range]))` | % |
 
-> As métricas `betman_bets_*` e `betman_errors_total` só aparecem depois do primeiro evento (primeira aposta, primeiro erro).
+> As séries `betman_bets_*` e `betman_odds_provider_failures_total` são registradas em 0 quando o app sobe, então `increase()`/`rate()` contam desde a primeira aposta e a primeira liquidação. `betman_errors_total` só aparece depois do primeiro erro.
+> `$__range` é uma variável do Grafana (o intervalo de tempo selecionado no dashboard); para testar no Prometheus troque por uma janela fixa, como `1h`.
+
+Essas queries formam o dashboard **BetMan · Negócio** (T16), provisionado a partir de [grafana/dashboards/betman-negocio.json](../grafana/dashboards/betman-negocio.json).
 
 ## JVM e infraestrutura
 

@@ -14,8 +14,11 @@ import com.betman.bet.BetRepository;
 import com.betman.bet.BetStatus;
 import com.betman.event.EventStatus;
 import com.betman.event.Outcome;
+import com.betman.event.Sport;
 import com.betman.event.SportEvent;
 import com.betman.wallet.WalletService;
+import io.micrometer.core.instrument.DistributionSummary;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
@@ -38,14 +41,17 @@ class SettlementServiceTest {
 	@Mock
 	private WalletService walletService;
 
+	private final SimpleMeterRegistry registry = new SimpleMeterRegistry();
+
 	private SettlementService service;
 
 	private SportEvent event;
 
 	@BeforeEach
 	void setUp() {
-		service = new SettlementService(betRepository, walletService, Clock.fixed(NOW, ZoneOffset.UTC));
-		event = SportEvent.builder().id(12L).homeTeam("Tubarões do Vale").awayTeam("Leões da Serra")
+		service = new SettlementService(betRepository, walletService, Clock.fixed(NOW, ZoneOffset.UTC),
+				registry);
+		event = SportEvent.builder().id(12L).sport(Sport.FOOTBALL).homeTeam("Tubarões do Vale").awayTeam("Leões da Serra")
 				.status(EventStatus.FINISHED).result(Outcome.HOME).finishedAt(NOW).build();
 	}
 
@@ -100,11 +106,69 @@ class SettlementServiceTest {
 	}
 
 	@Test
+	void settledBetsAreCountedByResultAndPayoutsAreRecorded() {
+		Bet winner = pendingBet(1L, 7L, Outcome.HOME, "25.00", "53.75");
+		Bet otherWinner = pendingBet(3L, 9L, Outcome.HOME, "10.00", "21.50");
+		Bet loser = pendingBet(2L, 8L, Outcome.DRAW, "5.00", "16.50");
+		when(betRepository.findByEventIdAndStatus(12L, BetStatus.PENDING))
+				.thenReturn(List.of(winner, otherWinner, loser));
+
+		service.settleEvent(event);
+
+		assertThat(settledCount("WON")).isEqualTo(2.0);
+		assertThat(settledCount("LOST")).isEqualTo(1.0);
+		DistributionSummary payout = registry.get(SettlementService.BETS_PAYOUT).tag("sport", "FOOTBALL").summary();
+		assertThat(payout.count()).isEqualTo(2);
+		assertThat(payout.totalAmount()).isEqualTo(75.25);
+		assertThat(payout.max()).isEqualTo(53.75);
+	}
+
+	@Test
+	void seriesStartAtZeroBeforeAnySettlement() {
+		assertThat(settledCount("WON")).isZero();
+		assertThat(settledCount("LOST")).isZero();
+		assertThat(registry.get(SettlementService.BETS_PAYOUT).tag("sport", "FOOTBALL").summary().count()).isZero();
+	}
+
+	@Test
+	void eventWithOnlyLosersRecordsNoWinsNorPayouts() {
+		Bet loser = pendingBet(2L, 8L, Outcome.AWAY, "10.00", "31.00");
+		when(betRepository.findByEventIdAndStatus(12L, BetStatus.PENDING)).thenReturn(List.of(loser));
+
+		service.settleEvent(event);
+
+		assertThat(settledCount("LOST")).isEqualTo(1.0);
+		assertThat(settledCount("WON")).isZero();
+		assertThat(registry.get(SettlementService.BETS_PAYOUT).summary().count()).isZero();
+	}
+
+	@Test
+	void resettlingDoesNotCountBetsTwice() {
+		Bet winner = pendingBet(1L, 7L, Outcome.HOME, "25.00", "53.75");
+		Bet loser = pendingBet(2L, 8L, Outcome.DRAW, "5.00", "16.50");
+		when(betRepository.findByEventIdAndStatus(12L, BetStatus.PENDING)).thenReturn(List.of(winner, loser));
+
+		service.settleEvent(event);
+		service.settleEvent(event);
+
+		assertThat(settledCount("WON")).isEqualTo(1.0);
+		assertThat(settledCount("LOST")).isEqualTo(1.0);
+		assertThat(registry.get(SettlementService.BETS_PAYOUT).summary().count()).isEqualTo(1);
+	}
+
+	@Test
 	void eventWithoutResultCannotBeSettled() {
 		event.setResult(null);
 
 		assertThatThrownBy(() -> service.settleEvent(event)).isInstanceOf(IllegalStateException.class);
 		verify(betRepository, never()).findByEventIdAndStatus(anyLong(), any());
+		assertThat(settledCount("WON")).isZero();
+		assertThat(settledCount("LOST")).isZero();
+	}
+
+	private double settledCount(String result) {
+		return registry.get(SettlementService.BETS_SETTLED).tag("result", result).tag("sport", "FOOTBALL").counter()
+				.count();
 	}
 
 	private static Bet pendingBet(Long id, Long userId, Outcome selection, String stake, String payout) {
