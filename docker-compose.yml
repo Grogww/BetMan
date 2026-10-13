@@ -23,6 +23,24 @@ services:
       retries: 5
       start_period: 10s
 
+  graylog-init:
+    image: curlimages/curl:8.10.1
+    container_name: betman-graylog-init
+    restart: "no"
+    entrypoint: ["/bin/sh", "/scripts/create-gelf-input.sh"]
+    environment:
+      GRAYLOG_URL: http://graylog:9000
+      GRAYLOG_ROOT_USERNAME: ${GRAYLOG_ROOT_USERNAME:-admin}
+      GRAYLOG_ROOT_PASSWORD: ${GRAYLOG_ROOT_PASSWORD:?defina GRAYLOG_ROOT_PASSWORD no .env}
+      GELF_INPUT_PORT: 12201
+    volumes:
+      - ./graylog/init/create-gelf-input.sh:/scripts/create-gelf-input.sh:ro
+    networks:
+      - betman-net
+    depends_on:
+      graylog:
+        condition: service_healthy
+
   app:
     image: ${BETMAN_IMAGE:-ghcr.io/grogww/betman:latest}
     build: .
