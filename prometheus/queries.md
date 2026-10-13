@@ -10,6 +10,7 @@ Todas as métricas do app têm a tag `application="betman"`. As queries HTTP exc
 | Req/s total | `sum(rate(http_server_requests_seconds_count{application="betman", uri!~"/actuator.*"}[1m]))` | req/s |
 | Req/s por endpoint | `sum by (uri, method) (rate(http_server_requests_seconds_count{application="betman", uri!~"/actuator.*"}[1m]))` | req/s |
 | Taxa de erro 5xx | `100 * sum(rate(http_server_requests_seconds_count{application="betman", status=~"5.."}[5m])) / sum(rate(http_server_requests_seconds_count{application="betman"}[5m]))` | % |
+| Taxa de erro 4xx | `100 * sum(rate(http_server_requests_seconds_count{application="betman", uri!~"/actuator.*", status=~"4.."}[5m])) / sum(rate(http_server_requests_seconds_count{application="betman", uri!~"/actuator.*"}[5m]))` | % |
 
 ## Latência
 
@@ -49,6 +50,8 @@ Essas queries formam o dashboard **BetMan · Negócio** (T16), provisionado a pa
 | CPU do processo | `100 * process_cpu_usage{application="betman"}` | % |
 | Conexões Hikari ativas | `hikaricp_connections_active{application="betman"}` | conexões |
 | Conexões Hikari pendentes | `hikaricp_connections_pending{application="betman"}` | conexões |
+
+As queries de Tráfego HTTP, Latência (exceto o provedor de odds) e JVM e infraestrutura formam o dashboard **BetMan · Aplicação**, provisionado a partir de [grafana/dashboards/betman-aplicacao.json](../grafana/dashboards/betman-aplicacao.json). No dashboard, a janela fixa (`[1m]`, `[5m]`) é trocada por `$__rate_interval`, que o Grafana ajusta ao zoom do gráfico.
 
 ## Notas
 - `rate(x[1m])` dá a média por segundo no último minuto; `* 60` converte para por minuto.
