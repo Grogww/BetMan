@@ -180,6 +180,22 @@ docker run --rm -i -v "$PWD/.hadolint.yaml:/.config/hadolint.yaml" hadolint/hado
 docker compose --env-file .env.example config --quiet
 ```
 
+## Geração de carga
+
+Com a stack no ar (`docker compose up -d`), rode:
+
+```bash
+./scripts/load.sh 10
+```
+
+O script cria usuários, deposita saldo, faz apostas, liquida um evento e força erros (400, 404, 409 e 422) para alimentar os dashboards do Grafana e os logs do Graylog.
+
+| Parâmetro | Padrão | Descrição |
+|---|---|---|
+| 1º argumento | `10` | número de rodadas |
+| `USERS` | `5` | quantidade de usuários criados |
+| `BASE_URL` | `http://localhost:8080` | endereço da API |
+
 ## Decisões registradas
 
 - **Projeto na raiz do repositório.** A especificação menciona `app/`, mas o Initializr gerou o
