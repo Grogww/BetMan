@@ -91,9 +91,11 @@ Ordem de subida garantida por `depends_on` + `healthcheck`: `db` → `app`; `pro
 flowchart LR
   ev["PR ou push na main"] --> build["build<br/>./mvnw verify"]
   ev --> lint["lint<br/>hadolint + compose config"]
-  build --> gate{"push na main?"}
-  lint --> gate
-  gate -->|"sim"| pub["publish-image<br/>GHCR: latest + sha"]
+  build --> img["publish-image<br/>build da imagem"]
+  lint --> img
+  img --> gate{"push na main?"}
+  gate -->|"não (PR)"| drop["imagem descartada"]
+  gate -->|"sim"| pub["push no GHCR<br/>latest + sha"]
   pub --> pull["docker compose pull<br/>docker compose up -d"]
 ```
 
@@ -250,14 +252,14 @@ Definida em [.github/workflows/ci.yml](.github/workflows/ci.yml).
 
 | Gatilho | Jobs executados |
 |---|---|
-| Pull request para a `main` | `build` e `lint`, em paralelo |
-| Push na `main` (merge de PR) | `build` e `lint`; se os dois passarem, `publish-image` |
+| Pull request para a `main` | `build` e `lint`, em paralelo; se os dois passarem, `publish-image` apenas constrói a imagem (sem push) |
+| Push na `main` (merge de PR) | `build` e `lint`; se os dois passarem, `publish-image` constrói e publica a imagem |
 
 | Job | O que faz |
 |---|---|
 | `build` | Java 21 (Temurin) com cache do Maven; roda `./mvnw -B verify` (compilação + testes) e publica os relatórios do Surefire como artefato `test-reports`, mesmo quando os testes falham |
 | `lint` | **hadolint** no `Dockerfile` (avisos `warning` ou `error` falham o job, conforme `.hadolint.yaml`) e **`docker compose config`** duas vezes: sem `.env`, garantindo que toda variável tem valor padrão e a stack sobe sem ele, e com o `.env.example`, garantindo que o exemplo é válido |
-| `publish-image` | build com Buildx (cache do GitHub Actions) e push para `ghcr.io/grogww/betman` com as tags `latest` e sha curto; autentica com o `GITHUB_TOKEN`, sem segredos extras |
+| `publish-image` | build com Buildx (cache do GitHub Actions). Em PR, a imagem é descartada: serve para validar que o `Dockerfile` ainda compila antes do merge (o hadolint só analisa o texto). Na `main`, faz push para `ghcr.io/grogww/betman` com as tags `latest` e sha curto; autentica com o `GITHUB_TOKEN`, sem segredos extras |
 
 Um novo push no mesmo PR cancela a execução anterior que ainda estiver rodando (`concurrency`).
 

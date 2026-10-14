@@ -1,5 +1,5 @@
 # Builds, tests and lints (Dockerfile + compose) every PR to main and every push to main.
-# Pushes to main also publish the Docker image to GHCR.
+# Every run also builds the Docker image; only pushes to main publish it to GHCR.
 name: CI
 
 on:
@@ -71,11 +71,11 @@ jobs:
       - name: Validar docker-compose.yml com .env.example
         run: docker compose --env-file .env.example config --quiet
 
-  # Delivery: only after a merge to main, and only if tests and lint passed
+  # Runs only if tests and lint passed. On a PR the image is built and discarded, catching a
+  # broken Dockerfile/pom.xml before the merge; on a push to main it is also published
   publish-image:
     name: publish-image
     needs: [build, lint]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
@@ -91,6 +91,7 @@ jobs:
 
       # GITHUB_TOKEN is created by GitHub for each run; no secret to configure
       - name: Login no GHCR
+        if: github.event_name == 'push'
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
@@ -111,7 +112,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
-          push: true
+          push: ${{ github.event_name == 'push' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
