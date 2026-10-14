@@ -19,7 +19,12 @@ Todas as métricas do app têm a tag `application="betman"`. As queries HTTP exc
 | p95 HTTP | `histogram_quantile(0.95, sum by (le) (rate(http_server_requests_seconds_bucket{application="betman", uri!~"/actuator.*"}[5m])))` | s |
 | p95 por endpoint | `histogram_quantile(0.95, sum by (le, uri) (rate(http_server_requests_seconds_bucket{application="betman", uri!~"/actuator.*"}[5m])))` | s |
 | p95 provedor de odds | `histogram_quantile(0.95, sum by (le) (rate(betman_odds_provider_latency_seconds_bucket[5m])))` | s |
+| Req/s por status (2xx) | `sum(rate(http_server_requests_seconds_count{application="betman", uri!~"/actuator.*", status=~"2.."}[1m]))` | req/s |
+| p95 por status (2xx) | `histogram_quantile(0.95, sum by (le) (rate(http_server_requests_seconds_bucket{application="betman", uri!~"/actuator.*", status=~"2.."}[5m])))` | s |
+| Média por status (2xx) | `sum(rate(http_server_requests_seconds_sum{application="betman", uri!~"/actuator.*", status=~"2.."}[5m])) / sum(rate(http_server_requests_seconds_count{application="betman", uri!~"/actuator.*", status=~"2.."}[5m]))` | s |
+| Total no período por status (2xx) | `sum(increase(http_server_requests_seconds_count{application="betman", uri!~"/actuator.*", status=~"2.."}[$__range])) or vector(0)` | requisições |
 
+> As queries "por status" se repetem para 4xx e 5xx, trocando o filtro para `status=~"4.."` e `status=~"5.."`. Cada classe vira uma série no painel, com legenda `2xx`, `4xx` e `5xx`. As séries 5xx só aparecem depois do primeiro erro do servidor; no total do período, o `or vector(0)` mostra 0 enquanto isso.
 > O p95 HTTP depende de `management.metrics.distribution.percentiles-histogram.http.server.requests: true` no `application.yml`.
 
 ## Negócio
@@ -47,9 +52,16 @@ Essas queries formam o dashboard **BetMan · Negócio** (T16), provisionado a pa
 | Painel | Query | Unidade |
 |---|---|---|
 | Heap usado | `100 * sum(jvm_memory_used_bytes{application="betman", area="heap"}) / sum(jvm_memory_max_bytes{application="betman", area="heap"})` | % |
-| CPU do processo | `100 * process_cpu_usage{application="betman"}` | % |
+| CPU do processo (JVM) | `100 * process_cpu_usage{application="betman"}` | % |
+| CPU do sistema (container) | `100 * system_cpu_usage{application="betman"}` | % |
+| Threads vivas | `jvm_threads_live_threads{application="betman"}` | threads |
+| Tempo em pausa de GC | `sum(rate(jvm_gc_pause_seconds_sum{application="betman"}[1m]))` | s/s |
+| Pausas de GC por segundo | `sum(rate(jvm_gc_pause_seconds_count{application="betman"}[1m]))` | pausas/s |
+| Uptime | `process_uptime_seconds{application="betman"}` | s |
 | Conexões Hikari ativas | `hikaricp_connections_active{application="betman"}` | conexões |
 | Conexões Hikari pendentes | `hikaricp_connections_pending{application="betman"}` | conexões |
+
+> No dashboard, a CPU usa a unidade `percentunit` do Grafana, então a query fica sem o `100 *`.
 
 As queries de Tráfego HTTP, Latência (exceto o provedor de odds) e JVM e infraestrutura formam o dashboard **BetMan · Aplicação**, provisionado a partir de [grafana/dashboards/betman-aplicacao.json](../grafana/dashboards/betman-aplicacao.json). No dashboard, a janela fixa (`[1m]`, `[5m]`) é trocada por `$__rate_interval`, que o Grafana ajusta ao zoom do gráfico.
 
