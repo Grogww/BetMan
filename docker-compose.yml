@@ -27,14 +27,15 @@ services:
     image: curlimages/curl:8.10.1
     container_name: betman-graylog-init
     restart: "no"
-    entrypoint: ["/bin/sh", "/scripts/create-gelf-input.sh"]
+    # GELF input first, then the WARN/ERROR stream; both scripts skip what already exists
+    entrypoint: ["/bin/sh", "-c", "sh /scripts/create-gelf-input.sh && sh /scripts/create-warn-error-stream.sh"]
     environment:
       GRAYLOG_URL: http://graylog:9000
       GRAYLOG_ROOT_USERNAME: ${GRAYLOG_ROOT_USERNAME:-admin}
       GRAYLOG_ROOT_PASSWORD: ${GRAYLOG_ROOT_PASSWORD:?defina GRAYLOG_ROOT_PASSWORD no .env}
       GELF_INPUT_PORT: 12201
     volumes:
-      - ./graylog/init/create-gelf-input.sh:/scripts/create-gelf-input.sh:ro
+      - ./graylog/init:/scripts:ro
     networks:
       - betman-net
     depends_on:
