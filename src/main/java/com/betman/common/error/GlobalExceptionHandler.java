@@ -20,7 +20,8 @@ import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExcep
 
 /**
  * Maps every exception to an RFC 9457 {@link ProblemDetail} carrying {@code errorCode} and
- * {@code requestId}. Business rejections are logged at WARN, unexpected failures at ERROR.
+ * {@code requestId}. Business rejections are logged at WARN, unexpected failures at ERROR, always
+ * with {@code errorCode} in the MDC so it becomes a searchable field in Graylog.
  */
 @Slf4j
 @RestControllerAdvice
@@ -40,6 +41,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 	@ExceptionHandler(BetManException.class)
 	public ProblemDetail handleBusiness(BetManException ex) {
 		ErrorCode code = ex.getErrorCode();
+		putErrorCode(code.name());
 		log.warn("Request rejected errorCode={} status={} detail={}", code, code.status().value(), ex.getMessage());
 		ProblemDetail problem = problem(code.status(), code, code.title(), ex.getMessage());
 		ex.customize(problem);
@@ -49,6 +51,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 	@ExceptionHandler(OptimisticLockingFailureException.class)
 	public ProblemDetail handleOptimisticLock(OptimisticLockingFailureException ex) {
 		ErrorCode code = ErrorCode.CONCURRENT_UPDATE;
+		putErrorCode(code.name());
 		log.warn("Concurrent update detected errorCode={} message={}", code, ex.getMessage());
 		return problem(code.status(), code, code.title(),
 				"O registro foi alterado por outra operação. Tente novamente.");
@@ -57,6 +60,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 	@ExceptionHandler(Exception.class)
 	public ProblemDetail handleUnexpected(Exception ex) {
 		ErrorCode code = ErrorCode.INTERNAL_ERROR;
+		putErrorCode(code.name());
 		log.error("Unhandled exception errorCode={} type={}", code, ex.getClass().getName(), ex);
 		return problem(code.status(), code, code.title(), "Ocorreu um erro inesperado. Tente novamente mais tarde.");
 	}
@@ -70,6 +74,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 		ProblemDetail problem = problem(HttpStatus.BAD_REQUEST, ErrorCode.VALIDATION_ERROR,
 				ErrorCode.VALIDATION_ERROR.title(), "Um ou mais campos são inválidos.");
 		problem.setProperty(ERRORS, errors);
+		putErrorCode(ErrorCode.VALIDATION_ERROR.name());
 		log.warn("Validation failed errorCode={} errors={}", ErrorCode.VALIDATION_ERROR, errors);
 		return new ResponseEntity<>(problem, headers, HttpStatus.BAD_REQUEST);
 	}
@@ -80,6 +85,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 		ProblemDetail problem = problem(HttpStatus.BAD_REQUEST, ErrorCode.VALIDATION_ERROR,
 				ErrorCode.VALIDATION_ERROR.title(), "Corpo da requisição inválido ou mal formatado.");
 		problem.setProperty(ERRORS, List.of(new FieldErrorDto("body", "JSON inválido ou campo com valor inaceitável")));
+		putErrorCode(ErrorCode.VALIDATION_ERROR.name());
 		log.warn("Unreadable request body errorCode={} message={}", ErrorCode.VALIDATION_ERROR,
 				ex.getMostSpecificCause().getMessage());
 		return new ResponseEntity<>(problem, headers, HttpStatus.BAD_REQUEST);
@@ -111,6 +117,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 		problem.setProperty(REQUEST_ID, MDC.get(RequestContextFilter.REQUEST_ID));
 		String errorCode = String.valueOf(problem.getProperties().get(ERROR_CODE));
 		countError(errorCode);
+		putErrorCode(errorCode);
 		log.warn("Request failed errorCode={} status={} detail={}", errorCode, statusCode.value(),
 				problem.getDetail());
 		return new ResponseEntity<>(problem, headers, statusCode);
@@ -124,6 +131,11 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 		problem.setProperty(REQUEST_ID, MDC.get(RequestContextFilter.REQUEST_ID));
 		countError(code.name());
 		return problem;
+	}
+
+	/** Cleared by {@link RequestContextFilter} when the request ends. */
+	private void putErrorCode(String errorCode) {
+		MDC.put(RequestContextFilter.ERROR_CODE, errorCode);
 	}
 
 	private void countError(String errorCode) {

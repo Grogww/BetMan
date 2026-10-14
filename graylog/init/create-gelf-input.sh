@@ -12,9 +12,10 @@ until curl -fs "${GRAYLOG_URL}/api/system/lbstatus" > /dev/null; do
   sleep 5
 done
 
+# Any GELF UDP input counts, even one created by hand under another title: a second one would fight for the port
 if curl -fs -u "${AUTH}" -H "Accept: application/json" \
-     "${GRAYLOG_URL}/api/system/inputs" | grep -q "\"title\":\"${INPUT_TITLE}\""; then
-  echo "Input '${INPUT_TITLE}' já existe, nada a fazer."
+     "${GRAYLOG_URL}/api/system/inputs" | grep -qE "\"title\":\"${INPUT_TITLE}\"|GELFUDPInput"; then
+  echo "Input GELF UDP já existe, nada a fazer."
   exit 0
 fi
 
