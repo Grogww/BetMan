@@ -358,8 +358,8 @@ Com a stack no ar (`docker compose up -d`), rode:
 ./scripts/load.sh 10
 ```
 
-O script cria usuários, deposita saldo, faz apostas, liquida um evento e força erros (400, 404, 409
-e 422) para alimentar os dashboards do Grafana e os logs do Graylog. No Windows, rode pelo Git Bash
+O script cria usuários, deposita saldo, faz apostas, liquida um evento e força erros (400, 404, 409,
+422 e 503 do provedor de odds ao vivo) para alimentar os dashboards do Grafana e os logs do Graylog. No Windows, rode pelo Git Bash
 ou WSL.
 
 | Parâmetro | Padrão | Descrição |

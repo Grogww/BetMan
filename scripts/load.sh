@@ -81,6 +81,12 @@ for round in $(seq 1 "$ROUNDS"); do
   done
   call GET /api/stats/summary > /dev/null
 
+  # Live odds from the simulated provider: random latency and occasional 503 (ODDS_PROVIDER_UNAVAILABLE)
+  odds_event="${open_event:-${own_event:-1}}"
+  for _ in $(seq 1 $(( (RANDOM % 6) + 10 ))); do
+    call GET "/api/events/${odds_event}/odds/live" > /dev/null
+  done
+
   # Forced errors (4xx) so the error panels and Graylog have data
   user="${user_ids[0]}"
   call POST /api/bets "" '{"eventId":1,"selection":"HOME","stake":10.00}' > /dev/null           # 400 sem X-User-Id
@@ -103,4 +109,4 @@ if [ -n "$own_event" ]; then
 fi
 
 echo
-echo "== Fim: ${ok} respostas 2xx, ${fail} respostas de erro (esperado: os erros foram forçados)"
+echo "== Fim: ${ok} respostas 2xx, ${fail} respostas de erro (esperado: 4xx forçados e 503 do provedor de odds)"
