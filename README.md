@@ -311,7 +311,7 @@ prontos, na pasta **BetMan**, sem nenhuma configuração manual.
 | Dashboard | Painéis |
 |---|---|
 | **BetMan · Negócio** | apostas, valor apostado e ticket médio no período; prêmios pagos e taxa de acerto; apostas por minuto; apostas ganhas × perdidas; liquidações ao longo do tempo; falhas e taxa de falha do provedor de odds |
-| **BetMan · Aplicação** | requisições por segundo (geral e por rota); latência p95 (geral e por rota); taxas de erro 4xx e 5xx; respostas de erro por segundo; heap da JVM; pool de conexões Hikari |
+| **BetMan · Aplicação** | requisições por segundo (geral, por rota e por status 2xx/4xx/5xx); total de requisições no período por status; latência p95 (geral, por rota e por status); latência média por status; taxas de erro 4xx e 5xx; uso de CPU (JVM e container); heap, threads, pausas de GC e uptime da JVM; pool de conexões Hikari |
 
 Os dashboards ficam com `No data` até existir tráfego — rode o [script de carga](#geração-de-carga).
 
