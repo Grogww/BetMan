@@ -8,7 +8,7 @@ services:
     environment:
       POSTGRES_DB: ${DB_NAME:-betman}
       POSTGRES_USER: ${DB_USERNAME:-betman}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:?defina DB_PASSWORD no .env}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-betman}
     ports:
       - "${DB_PORT:-5433}:5432"
     volumes:
@@ -32,7 +32,7 @@ services:
     environment:
       GRAYLOG_URL: http://graylog:9000
       GRAYLOG_ROOT_USERNAME: ${GRAYLOG_ROOT_USERNAME:-admin}
-      GRAYLOG_ROOT_PASSWORD: ${GRAYLOG_ROOT_PASSWORD:?defina GRAYLOG_ROOT_PASSWORD no .env}
+      GRAYLOG_ROOT_PASSWORD: ${GRAYLOG_ROOT_PASSWORD:-admin}
       GELF_INPUT_PORT: 12201
     volumes:
       - ./graylog/init:/scripts:ro
@@ -50,7 +50,7 @@ services:
     environment:
       DB_URL: ${DB_URL:-jdbc:postgresql://db:5432/betman}
       DB_USERNAME: ${DB_USERNAME:-betman}
-      DB_PASSWORD: ${DB_PASSWORD:?defina DB_PASSWORD no .env}
+      DB_PASSWORD: ${DB_PASSWORD:-betman}
       SERVER_PORT: ${SERVER_PORT:-8080}
       BETMAN_LOG_LEVEL: ${BETMAN_LOG_LEVEL:-DEBUG}
       BETMAN_SIMULATION_ENABLED: ${BETMAN_SIMULATION_ENABLED:-true}
@@ -105,7 +105,7 @@ services:
     restart: unless-stopped
     environment:
       GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
-      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?defina GRAFANA_ADMIN_PASSWORD no .env}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
       GF_USERS_ALLOW_SIGN_UP: "false"
       GF_ANALYTICS_REPORTING_ENABLED: "false"
     volumes:
@@ -178,8 +178,9 @@ services:
     mem_limit: 1536m
     environment:
       GRAYLOG_ROOT_USERNAME: ${GRAYLOG_ROOT_USERNAME:-admin}
-      GRAYLOG_PASSWORD_SECRET: ${GRAYLOG_PASSWORD_SECRET:?defina GRAYLOG_PASSWORD_SECRET no .env}
-      GRAYLOG_ROOT_PASSWORD_SHA2: ${GRAYLOG_ROOT_PASSWORD_SHA2:?defina GRAYLOG_ROOT_PASSWORD_SHA2 no .env}
+      GRAYLOG_PASSWORD_SECRET: ${GRAYLOG_PASSWORD_SECRET:-troque-este-segredo-com-16+-caracteres}
+      # Must be the SHA-256 of GRAYLOG_ROOT_PASSWORD (graylog-init), otherwise its API calls get 401
+      GRAYLOG_ROOT_PASSWORD_SHA2: ${GRAYLOG_ROOT_PASSWORD_SHA2:-8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918}
       GRAYLOG_HTTP_BIND_ADDRESS: 0.0.0.0:9000
       GRAYLOG_HTTP_EXTERNAL_URI: http://localhost:${GRAYLOG_PORT:-9000}/
       GRAYLOG_ELASTICSEARCH_HOSTS: http://opensearch:9200
