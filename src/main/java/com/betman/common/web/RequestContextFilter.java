@@ -15,7 +15,8 @@ import org.springframework.web.filter.OncePerRequestFilter;
 /**
  * Puts {@code requestId} (from {@code X-Request-Id} or generated) and {@code userId} (from
  * {@code X-User-Id}, when present) into the MDC so every log line of the request carries them.
- * The request id is echoed back in the {@code X-Request-Id} response header.
+ * The request id is echoed back in the {@code X-Request-Id} response header. {@code errorCode} is
+ * put by {@code GlobalExceptionHandler} and cleared here together with the others.
  */
 @Component("betManRequestContextFilter")
 @Order(Ordered.HIGHEST_PRECEDENCE)
@@ -23,6 +24,7 @@ public class RequestContextFilter extends OncePerRequestFilter {
 
 	public static final String REQUEST_ID = "requestId";
 	public static final String USER_ID = "userId";
+	public static final String ERROR_CODE = "errorCode";
 	public static final String REQUEST_ID_HEADER = "X-Request-Id";
 	public static final String USER_ID_HEADER = "X-User-Id";
 
@@ -44,6 +46,7 @@ public class RequestContextFilter extends OncePerRequestFilter {
 		} finally {
 			MDC.remove(REQUEST_ID);
 			MDC.remove(USER_ID);
+			MDC.remove(ERROR_CODE);
 		}
 	}
 }
