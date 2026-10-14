@@ -63,8 +63,12 @@ jobs:
         with:
           dockerfile: Dockerfile
 
-      # .env.example supplies the required variables (DB_PASSWORD) that CI doesn't have
-      - name: Validar docker-compose.yml
+      # CI has no .env: guarantees every variable has a default and the stack starts without one
+      - name: Validar docker-compose.yml sem .env
+        run: docker compose config --quiet
+
+      # Catches typos or invalid values in the example file
+      - name: Validar docker-compose.yml com .env.example
         run: docker compose --env-file .env.example config --quiet
 
   # Delivery: only after a merge to main, and only if tests and lint passed

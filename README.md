@@ -104,11 +104,13 @@ disponível para o Docker** (Graylog, OpenSearch e MongoDB somam até 3,5 GB pel
 Não é preciso ter JDK nem PostgreSQL instalados.
 
 ```bash
-cp .env.example .env            # PowerShell: Copy-Item .env.example .env
 docker compose up -d
 docker compose ps               # aguarde todos os serviços ficarem "healthy"
 ./scripts/load.sh 10            # gera tráfego, erros e logs (Git Bash/WSL no Windows)
 ```
+
+Não é preciso criar o `.env`: todas as variáveis têm valor padrão no compose, iguais às do
+[.env.example](.env.example). Para trocar alguma, veja [Variáveis do `.env`](#variáveis-do-env).
 
 Na primeira vez as imagens são baixadas e a stack leva de 2 a 3 minutos para ficar pronta — o
 Graylog é o mais lento. Depois disso, acesse os serviços pelas portas do
@@ -136,14 +138,22 @@ docker compose down -v          # remove tudo, inclusive bancos, métricas, logs
 
 ### Variáveis do `.env`
 
-Todas têm exemplo em [.env.example](.env.example). As marcadas como **obrigatória** não têm valor
-padrão no compose: sem elas o `docker compose up` falha com uma mensagem indicando a variável.
+O `.env` é **opcional**: todas as variáveis têm valor padrão no `docker-compose.yml`, iguais aos
+exemplos abaixo, e a stack sobe sem ele. Para personalizar, copie o exemplo e edite só o que quiser
+trocar:
+
+```bash
+cp .env.example .env            # PowerShell: Copy-Item .env.example .env
+```
+
+> `GRAYLOG_ROOT_PASSWORD` e `GRAYLOG_ROOT_PASSWORD_SHA2` precisam corresponder à mesma senha. Se
+> trocar uma, troque a outra; se divergirem, o `graylog-init` falha com `401`.
 
 | Variável | Exemplo | Uso |
 |---|---|---|
 | `DB_NAME` | `betman` | nome do banco criado pelo Postgres |
 | `DB_USERNAME` | `betman` | usuário do banco |
-| `DB_PASSWORD` | `betman` | senha do banco (**obrigatória**) |
+| `DB_PASSWORD` | `betman` | senha do banco |
 | `DB_URL` | `jdbc:postgresql://db:5432/betman` | URL JDBC; o host é o serviço `db` |
 | `APP_PORT` | `8080` | porta do app no seu computador |
 | `DB_PORT` | `5433` | porta do Postgres no seu computador (evita conflito com um Postgres local) |
@@ -155,13 +165,13 @@ padrão no compose: sem elas o `docker compose up` falha com uma mensagem indica
 | `PROMETHEUS_RETENTION` | `7d` | tempo de retenção das métricas |
 | `GRAFANA_PORT` | `3000` | porta do Grafana no seu computador |
 | `GRAFANA_ADMIN_USER` | `admin` | usuário administrador do Grafana |
-| `GRAFANA_ADMIN_PASSWORD` | `admin` | senha do administrador do Grafana (**obrigatória**) |
+| `GRAFANA_ADMIN_PASSWORD` | `admin` | senha do administrador do Grafana |
 | `GRAYLOG_PORT` | `9000` | porta da interface web do Graylog no seu computador |
 | `GRAYLOG_GELF_PORT` | `12201` | porta UDP do input GELF no seu computador |
 | `GRAYLOG_ROOT_USERNAME` | `admin` | usuário administrador do Graylog |
-| `GRAYLOG_PASSWORD_SECRET` | *(16+ caracteres)* | segredo interno do Graylog (**obrigatória**) — gere com `openssl rand -hex 32` |
-| `GRAYLOG_ROOT_PASSWORD_SHA2` | *(SHA-256 de `admin`)* | hash da senha do admin (**obrigatória**) — gere com `echo -n suaSenha \| sha256sum` |
-| `GRAYLOG_ROOT_PASSWORD` | `admin` | a mesma senha em texto, usada pelo `graylog-init` para chamar a API (**obrigatória**) |
+| `GRAYLOG_PASSWORD_SECRET` | *(16+ caracteres)* | segredo interno do Graylog — gere com `openssl rand -hex 32` |
+| `GRAYLOG_ROOT_PASSWORD_SHA2` | *(SHA-256 de `admin`)* | hash da senha do admin — gere com `echo -n suaSenha \| sha256sum` |
+| `GRAYLOG_ROOT_PASSWORD` | `admin` | a mesma senha em texto, usada pelo `graylog-init` para chamar a API |
 
 ## Mapa de portas e credenciais
 
@@ -246,7 +256,7 @@ Definida em [.github/workflows/ci.yml](.github/workflows/ci.yml).
 | Job | O que faz |
 |---|---|
 | `build` | Java 21 (Temurin) com cache do Maven; roda `./mvnw -B verify` (compilação + testes) e publica os relatórios do Surefire como artefato `test-reports`, mesmo quando os testes falham |
-| `lint` | **hadolint** no `Dockerfile` (avisos `warning` ou `error` falham o job, conforme `.hadolint.yaml`) e **`docker compose config`** com o `.env.example`, garantindo que o compose é válido e que o exemplo tem todas as variáveis obrigatórias |
+| `lint` | **hadolint** no `Dockerfile` (avisos `warning` ou `error` falham o job, conforme `.hadolint.yaml`) e **`docker compose config`** duas vezes: sem `.env`, garantindo que toda variável tem valor padrão e a stack sobe sem ele, e com o `.env.example`, garantindo que o exemplo é válido |
 | `publish-image` | build com Buildx (cache do GitHub Actions) e push para `ghcr.io/grogww/betman` com as tags `latest` e sha curto; autentica com o `GITHUB_TOKEN`, sem segredos extras |
 
 Um novo push no mesmo PR cancela a execução anterior que ainda estiver rodando (`concurrency`).
@@ -255,6 +265,7 @@ Para rodar as validações do `lint` localmente:
 
 ```bash
 docker run --rm -i -v "$PWD/.hadolint.yaml:/.config/hadolint.yaml" hadolint/hadolint < Dockerfile
+docker compose --env-file /dev/null config --quiet   # ignora um .env local, como no CI
 docker compose --env-file .env.example config --quiet
 ```
 
@@ -362,10 +373,6 @@ finaliza e liquida eventos, e o provedor de odds falha em cerca de 5% das consul
 
 ## Troubleshooting
 
-**`required variable DB_PASSWORD is missing` (ou outra variável) no `docker compose up`**
-O `.env` não foi criado ou está incompleto. Rode `cp .env.example .env` e confira as variáveis
-marcadas como obrigatórias na [tabela do `.env`](#variáveis-do-env).
-
 **`port is already allocated` / `address already in use`**
 Outra aplicação já usa a porta no seu computador. Troque a variável correspondente no `.env`
 (veja o [mapa de portas](#mapa-de-portas-e-credenciais)) e rode `docker compose up -d` de novo. O
@@ -435,7 +442,7 @@ anterior a ele, apague o arquivo e restaure com `git checkout -- scripts/load.sh
 | ✅ | Monitoramento local (Prometheus) | [prometheus/prometheus.yml](prometheus/prometheus.yml), `/actuator/prometheus`, métricas de negócio | [alvos](#prometheus) |
 | ⬜ | Observabilidade e dashboards (Grafana) | [grafana/provisioning](grafana/provisioning), [grafana/dashboards](grafana/dashboards). **Pendente:** painéis de uso de CPU e de contagem/tempo de resposta por status (2xx, 4xx, 5xx) | [dashboards](#dashboards-do-grafana) |
 | ⬜ | Gestão centralizada de logs (Graylog) | [logback-spring.xml](src/main/resources/logback-spring.xml), [graylog/init](graylog/init). **Pendente:** logs de nível ERROR para as respostas 5xx | [logs](#logs-no-graylog) |
-| ⬜ | Orquestração única (`docker-compose.yml`) | [docker-compose.yml](docker-compose.yml) — 8 serviços com healthchecks. **Pendente:** subir com `docker compose up --build` sem precisar criar o `.env` | [stack](#stack-no-ar) |
+| ✅ | Orquestração única (`docker-compose.yml`) | [docker-compose.yml](docker-compose.yml) — 8 serviços com healthchecks; sobe com `docker compose up --build` sem precisar criar o `.env` | [stack](#stack-no-ar) |
 
 ### Entregáveis
 
