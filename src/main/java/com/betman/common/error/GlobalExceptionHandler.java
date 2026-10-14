@@ -20,8 +20,9 @@ import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExcep
 
 /**
  * Maps every exception to an RFC 9457 {@link ProblemDetail} carrying {@code errorCode} and
- * {@code requestId}. Business rejections are logged at WARN, unexpected failures at ERROR, always
- * with {@code errorCode} in the MDC so it becomes a searchable field in Graylog.
+ * {@code requestId}. Business rejections (4xx) are logged at WARN, 5xx responses and unexpected
+ * failures at ERROR, always with {@code errorCode} in the MDC so it becomes a searchable field in
+ * Graylog.
  */
 @Slf4j
 @RestControllerAdvice
@@ -42,7 +43,11 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 	public ProblemDetail handleBusiness(BetManException ex) {
 		ErrorCode code = ex.getErrorCode();
 		putErrorCode(code.name());
-		log.warn("Request rejected errorCode={} status={} detail={}", code, code.status().value(), ex.getMessage());
+		if (code.status().is5xxServerError()) {
+			log.error("Request failed errorCode={} status={} detail={}", code, code.status().value(), ex.getMessage());
+		} else {
+			log.warn("Request rejected errorCode={} status={} detail={}", code, code.status().value(), ex.getMessage());
+		}
 		ProblemDetail problem = problem(code.status(), code, code.title(), ex.getMessage());
 		ex.customize(problem);
 		return problem;

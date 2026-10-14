@@ -80,6 +80,19 @@ class GlobalExceptionHandlerMdcTest {
 	}
 
 	@Test
+	void businessErrorWith5xxStatusIsLoggedAtError() throws Exception {
+		when(betService.place(eq(1L), any())).thenThrow(new OddsProviderUnavailableException(12L));
+
+		placeBet(VALID_BODY).andExpect(status().isServiceUnavailable());
+
+		ILoggingEvent event = singleEvent();
+		assertThat(event.getLevel()).isEqualTo(Level.ERROR);
+		assertThat(event.getMDCPropertyMap())
+				.containsEntry(RequestContextFilter.ERROR_CODE, "ODDS_PROVIDER_UNAVAILABLE")
+				.containsEntry(RequestContextFilter.REQUEST_ID, REQUEST_ID);
+	}
+
+	@Test
 	void invalidBodyIsLoggedWithValidationErrorCode() throws Exception {
 		placeBet("{\"selection\": \"HOME\", \"stake\": -1}").andExpect(status().isBadRequest());
 
