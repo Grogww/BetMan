@@ -103,28 +103,41 @@ flowchart LR
 
 Pré-requisitos: Docker com Compose v2 (`docker compose version`) e **pelo menos 6 GB de memória
 disponível para o Docker** (Graylog, OpenSearch e MongoDB somam até 3,5 GB pelos `mem_limit`).
-Não é preciso ter JDK nem PostgreSQL instalados.
+Não é preciso ter JDK, Maven nem PostgreSQL instalados: a compilação acontece dentro do Docker.
 
 ```bash
-docker compose up -d
+git clone https://github.com/Grogww/BetMan.git
+cd BetMan
+docker compose up --build
+```
+
+Esse único comando compila a aplicação pelo [Dockerfile multistage](#dockerfile-multistage), sobe
+os 8 serviços na ordem certa e configura o Graylog sozinho (input GELF e stream). Não há nenhum
+passo manual: o `.env` é opcional, o datasource e os dashboards do Grafana são provisionados por
+arquivo e o Prometheus já começa a coletar as métricas do app.
+
+Na primeira vez as imagens são baixadas e a stack leva de 2 a 3 minutos para ficar pronta — o
+Graylog é o mais lento. Em outro terminal, acompanhe e gere tráfego:
+
+```bash
 docker compose ps               # aguarde todos os serviços ficarem "healthy"
 ./scripts/load.sh 10            # gera tráfego, erros e logs (Git Bash/WSL no Windows)
 ```
 
+Depois disso, acesse os serviços pelas portas do [mapa abaixo](#mapa-de-portas-e-credenciais).
+
 Não é preciso criar o `.env`: todas as variáveis têm valor padrão no compose, iguais às do
 [.env.example](.env.example). Para trocar alguma, veja [Variáveis do `.env`](#variáveis-do-env).
 
-Na primeira vez as imagens são baixadas e a stack leva de 2 a 3 minutos para ficar pronta — o
-Graylog é o mais lento. Depois disso, acesse os serviços pelas portas do
-[mapa abaixo](#mapa-de-portas-e-credenciais).
-
-O compose usa a imagem publicada pela pipeline em `ghcr.io/grogww/betman`:
+O serviço `app` tem `build: .` e `image: ghcr.io/grogww/betman`, então dá para escolher entre o
+código local e a imagem publicada pela pipeline:
 
 | Objetivo | Comando |
 |---|---|
-| Rodar a imagem publicada | `docker compose up -d` |
-| Atualizar para a última versão da `main` | `docker compose pull && docker compose up -d` |
-| Rodar o código local (gera a imagem pelo Dockerfile multistage) | `docker compose up -d --build` |
+| Compilar o código local e subir a stack (comando do enunciado) | `docker compose up --build` |
+| O mesmo, em segundo plano | `docker compose up -d --build` |
+| Rodar a imagem publicada no GHCR, sem compilar | `docker compose up -d` |
+| Atualizar para a última imagem da `main` | `docker compose pull && docker compose up -d` |
 
 Cada merge na `main` publica duas tags: `latest` e o sha curto do commit (ex.: `a1b2c3d`). Para
 fixar uma versão, defina `BETMAN_IMAGE=ghcr.io/grogww/betman:<sha>` no `.env`.
@@ -319,9 +332,14 @@ Os dashboards ficam com `No data` até existir tráfego — rode o [script de ca
 
 ## Gestão centralizada de logs
 
+A stack completa do Graylog sobe pelo compose: `graylog` (servidor e interface web), `mongodb`
+(metadados) e `opensearch` (armazenamento e indexação das mensagens).
+
 Com o profile `docker` (ativado pelo compose), o [logback-spring.xml](src/main/resources/logback-spring.xml)
-envia todos os logs ao Graylog via **GELF UDP**, além de manter a saída no console. O envio é
-assíncrono e descarta mensagens se a fila encher, para nunca bloquear uma requisição.
+envia todos os logs ao Graylog via **GELF UDP** com o appender `de.siegmar:logback-gelf`, além de
+manter a saída no console. Cada linha chega como mensagem estruturada (campos separados, não texto
+solto). O envio é assíncrono e descarta mensagens se a fila encher, para nunca bloquear uma
+requisição.
 
 Na subida, o serviço `graylog-init` executa os scripts de [graylog/init](graylog/init), que:
 
@@ -329,6 +347,18 @@ Na subida, o serviço `graylog-init` executa os scripts de [graylog/init](graylo
 2. criam e iniciam o stream **BetMan WARN/ERROR**, que separa os logs `WARN` e `ERROR` do app.
 
 Os dois scripts verificam se o recurso já existe, então podem rodar a cada `docker compose up`.
+
+### Níveis de log
+
+O pacote `com.betman` loga em `DEBUG` por padrão (`BETMAN_LOG_LEVEL`), então os quatro níveis
+chegam ao Graylog:
+
+| Nível | `level` (GELF) | O que gera | Exemplo |
+|---|---|---|---|
+| `DEBUG` | `7` | cálculo de odds, sorteio de resultados, ticks do scheduler, movimentos de carteira | `Odds calculated pHome=... oddHome=...` |
+| `INFO` | `6` | usuário criado, depósito, aposta feita, evento iniciado/liquidado | `Bet placed betId=... stake=...` |
+| `WARN` | `4` | rejeições de negócio e de validação (respostas 4xx) | `Request rejected errorCode=INSUFFICIENT_BALANCE status=422` |
+| `ERROR` | `3` | respostas 5xx: falha do provedor de odds (503) e erros inesperados (500, com stack trace) | `Request failed errorCode=ODDS_PROVIDER_UNAVAILABLE status=503` |
 
 Campos disponíveis em cada mensagem:
 
@@ -346,15 +376,18 @@ Buscas de exemplo em <http://localhost:9000/search>:
 | Busca | Resultado |
 |---|---|
 | `app:betman` | todos os logs da aplicação |
-| `level_name:WARN AND _exists_:errorCode` | todas as rejeições de negócio |
+| `level_name:DEBUG` | logs de debug (odds, sorteios, scheduler, carteira) |
+| `level_name:INFO` | eventos normais da aplicação |
+| `level_name:ERROR` | respostas 5xx (provedor de odds e erros inesperados) |
+| `_exists_:errorCode` | todas as respostas de erro, 4xx (`WARN`) e 5xx (`ERROR`) |
 | `errorCode:INSUFFICIENT_BALANCE` | apostas recusadas por saldo insuficiente |
-| `errorCode:ODDS_PROVIDER_UNAVAILABLE` | falhas simuladas do provedor de odds |
+| `errorCode:ODDS_PROVIDER_UNAVAILABLE` | falhas simuladas do provedor de odds (503, `ERROR`) |
 | `requestId:"<id>"` | todas as linhas de uma mesma requisição (copie o id da resposta de erro) |
 | `userId:1` | tudo o que o usuário `demo` fez |
 
 ## Geração de carga
 
-Com a stack no ar (`docker compose up -d`), rode:
+Com a stack no ar (`docker compose up --build`), rode em outro terminal:
 
 ```bash
 ./scripts/load.sh 10
@@ -426,25 +459,36 @@ anterior a ele, apague o arquivo e restaure com `git checkout -- scripts/load.sh
 
 ## Checklist de requisitos
 
-### Requisitos obrigatórios
+Cada item do enunciado e da rubrica de avaliação, com o arquivo que o atende e a evidência.
+
+### 0 · Multistage Build (eliminatório)
 
 | | Requisito | Onde está |
 |---|---|---|
 | ✅ | Dockerfile com **Multistage Build** para gerar a imagem de produção | [Dockerfile](Dockerfile) |
 | ✅ | Estágio 1 (Build): imagem com Maven/JDK para compilar e gerar o `.jar` | estágio `build` — `maven:3.9-eclipse-temurin-21` |
-| ✅ | Estágio 2 (Runtime): imagem enxuta contendo apenas o JRE necessário para rodar | `eclipse-temurin:21-jre-alpine`, usuário não-root |
+| ✅ | Estágio 2 (Runtime): imagem enxuta contendo apenas o JRE necessário para rodar | `eclipse-temurin:21-jre-alpine`, só o `.jar`, usuário não-root |
 
 ### Requisitos detalhados
 
-✅ concluído · ⬜ pendente
-
 | | Requisito | Onde está | Evidência |
 |---|---|---|---|
-| ⬜ | Automação e pipeline de CI/CD | [.github/workflows/ci.yml](.github/workflows/ci.yml) — build, testes, lint e publicação no GHCR. **Pendente:** build da imagem também nos PRs | [pipeline](#pipeline-cicd-rodando) |
-| ✅ | Monitoramento local (Prometheus) | [prometheus/prometheus.yml](prometheus/prometheus.yml), `/actuator/prometheus`, métricas de negócio | [alvos](#prometheus) |
-| ⬜ | Observabilidade e dashboards (Grafana) | [grafana/provisioning](grafana/provisioning), [grafana/dashboards](grafana/dashboards). **Pendente:** painéis de uso de CPU e de contagem/tempo de resposta por status (2xx, 4xx, 5xx) | [dashboards](#dashboards-do-grafana) |
-| ⬜ | Gestão centralizada de logs (Graylog) | [logback-spring.xml](src/main/resources/logback-spring.xml), [graylog/init](graylog/init). **Pendente:** logs de nível ERROR para as respostas 5xx | [logs](#logs-no-graylog) |
-| ✅ | Orquestração única (`docker-compose.yml`) | [docker-compose.yml](docker-compose.yml) — 8 serviços com healthchecks; sobe com `docker compose up --build` sem precisar criar o `.env` | [stack](#stack-no-ar) |
+| ✅ | **1 · Pipeline CI/CD** disparada em push e PR na `main` | [ci.yml](.github/workflows/ci.yml) — gatilhos `push` e `pull_request` | [pipeline](#pipeline-cicd-rodando) |
+| ✅ | ↳ Compilação e testes | job `build` — `./mvnw -B verify` (JUnit 5, Mockito, `@WebMvcTest`) | [pipeline](#pipeline-cicd-rodando) |
+| ✅ | ↳ Build da imagem com o Multistage Build | job `publish-image` — Buildx com o `Dockerfile`, em PR e na `main` | [pipeline](#pipeline-cicd-rodando) |
+| ✅ | ↳ Push para um Container Registry | job `publish-image` — GHCR (`ghcr.io/grogww/betman`), tags `latest` + sha, a cada push na `main` | [GHCR](#pipeline-cicd-rodando) |
+| ✅ | **2 · Monitoramento** — métricas via Actuator + Micrometer em `/actuator/prometheus` | [application.yml](src/main/resources/application.yml), `micrometer-registry-prometheus` no [pom.xml](pom.xml) | [alvos](#prometheus) |
+| ✅ | ↳ Prometheus fazendo scrape contínuo do app | [prometheus.yml](prometheus/prometheus.yml) — job `betman-app` a cada 15 s | [alvos](#prometheus) |
+| ✅ | **3 · Grafana** com Prometheus como datasource | [datasources/prometheus.yml](grafana/provisioning/datasources/prometheus.yml), provisionado | [dashboards](#dashboards-do-grafana) |
+| ✅ | ↳ Heap da JVM | painel *Heap da JVM* — BetMan · Aplicação | [dashboards](#dashboards-do-grafana) |
+| ✅ | ↳ Uso de CPU da aplicação | painel *Uso de CPU* (processo da JVM e container) | [dashboards](#dashboards-do-grafana) |
+| ✅ | ↳ Requisições HTTP por segundo (RPS) | painéis *Requisições por segundo* (geral, por rota e por status) | [dashboards](#dashboards-do-grafana) |
+| ✅ | ↳ Contagem e tempo de resposta por status (2xx, 4xx, 5xx) | *Total de requisições no período por status*, *Latência p95 por status*, *Latência média por status* | [dashboards](#dashboards-do-grafana) |
+| ✅ | **4 · Graylog** completo (com MongoDB e OpenSearch) | [docker-compose.yml](docker-compose.yml) — `graylog`, `mongodb`, `opensearch` | [logs](#logs-no-graylog) |
+| ✅ | ↳ Logs estruturados enviados via Logback + appender GELF | [logback-spring.xml](src/main/resources/logback-spring.xml), input criado por [graylog/init](graylog/init) | [logs](#logs-no-graylog) |
+| ✅ | ↳ Logs de erro, info e debug visíveis e pesquisáveis | [níveis de log](#níveis-de-log) — `DEBUG`, `INFO`, `WARN` (4xx) e `ERROR` (5xx) | [logs](#logs-no-graylog) |
+| ✅ | **5 · Orquestração única** com `docker compose up --build` | [docker-compose.yml](docker-compose.yml) — 8 serviços, `depends_on` + `healthcheck`, sem `.env` obrigatório e sem passo manual | [stack](#stack-no-ar) |
+| ✅ | **6 · README** com instruções, decisões técnicas e evidências | este arquivo — [Início rápido](#início-rápido), [Decisões registradas](#decisões-registradas), [Evidências](#evidências) | — |
 
 ### Entregáveis
 
@@ -453,11 +497,22 @@ anterior a ele, apague o arquivo e restaure com `git checkout -- scripts/load.sh
 - [x] `docker-compose.yml` orquestrando toda a stack (App + Prometheus + Grafana + Graylog + bancos) — [docker-compose.yml](docker-compose.yml)
 - [x] Configurações da pipeline em `.github/workflows` — [ci.yml](.github/workflows/ci.yml)
 - [x] Arquivos de configuração do Prometheus, Grafana e Logback/GELF — [prometheus](prometheus), [grafana](grafana), [logback-spring.xml](src/main/resources/logback-spring.xml)
-- [ ] README completo com:
+- [x] README completo com:
   - [x] Instruções claras de como rodar o projeto — [Início rápido](#início-rápido)
-  - [ ] Prints/evidências da pipeline CI/CD rodando com sucesso — [Evidências](#pipeline-cicd-rodando)
-  - [ ] Prints dos dashboards do Grafana exibindo os gráficos — [Evidências](#dashboards-do-grafana)
-  - [ ] Prints dos logs da aplicação sendo exibidos no Graylog — [Evidências](#logs-no-graylog)
+  - [x] Prints/evidências da pipeline CI/CD rodando com sucesso — [Evidências](#pipeline-cicd-rodando)
+  - [x] Prints dos dashboards do Grafana exibindo os gráficos — [Evidências](#dashboards-do-grafana)
+  - [x] Prints dos logs da aplicação sendo exibidos no Graylog — [Evidências](#logs-no-graylog)
+
+### Correções após a primeira versão
+
+Ao conferir a entrega contra o enunciado, quatro pontos foram corrigidos:
+
+| PR | Correção | Requisito |
+|---|---|---|
+| [#24](https://github.com/Grogww/BetMan/pull/24) | O compose passou a ter valor padrão para todas as variáveis: `docker compose up --build` sobe sem criar o `.env`. O `lint` valida o compose também sem `.env` para o problema não voltar | 5 · Orquestração única, sem intervenção manual |
+| [#25](https://github.com/Grogww/BetMan/pull/25) | Dashboard **BetMan · Aplicação** completado com uso de CPU, threads, GC, uptime e HTTP por status (RPS, contagem, latência p95 e média para 2xx, 4xx e 5xx) | 3 · Grafana |
+| [#26](https://github.com/Grogww/BetMan/pull/26) | Respostas 5xx passaram a ser logadas em `ERROR` (as 4xx continuam em `WARN`), e o script de carga passou a chamar as odds ao vivo para gerar os 503 do provedor | 4 · Graylog — logs de erro visíveis |
+| [#27](https://github.com/Grogww/BetMan/pull/27) | A imagem Docker passou a ser construída também nos PRs (sem push), não só na `main` | 1 · Pipeline — build da imagem a cada push ou PR |
 
 ## Evidências
 
@@ -473,25 +528,38 @@ Imagem publicada no GHCR com as tags `latest` e sha:
 
 ### Stack no ar
 
+Os 8 serviços após `docker compose up --build`, todos `healthy` (o `graylog-init` encerra com
+`Exited (0)` depois de configurar o Graylog):
+
 ![docker compose ps](docs/img/compose-ps.png)
 
 ### Prometheus
 
-Alvo `betman-app` com estado `UP`:
+Alvos `betman-app` e `prometheus` com estado `UP`:
 
 ![Alvos do Prometheus](docs/img/prometheus-targets.png)
 
 ### Dashboards do Grafana
 
-![Dashboard BetMan · Negócio](docs/img/grafana-negocio.png)
+**BetMan · Aplicação** — RPS, contagem e latência por status (2xx, 4xx, 5xx), CPU, heap, threads,
+GC e pool de conexões:
 
 ![Dashboard BetMan · Aplicação](docs/img/grafana-aplicacao.png)
 
+**BetMan · Negócio** — apostas, valores, liquidações e falhas do provedor de odds:
+
+![Dashboard BetMan · Negócio](docs/img/grafana-negocio.png)
+
 ### Logs no Graylog
 
-Busca com os campos `requestId`, `userId` e `errorCode`:
+Busca `app:betman` com logs `DEBUG`, `INFO`, `WARN` e `ERROR` e os campos `requestId`, `userId` e
+`errorCode`:
 
 ![Busca no Graylog](docs/img/graylog-busca.png)
+
+Busca `level_name:ERROR` com as falhas 503 do provedor de odds:
+
+![Logs ERROR no Graylog](docs/img/graylog-error.png)
 
 Stream BetMan WARN/ERROR:
 
@@ -591,8 +659,8 @@ fixa e `@MockitoBean`. São os mesmos executados pelo job `build` da pipeline.
 
 ## Decisões registradas
 
-- **Projeto na raiz do repositório.** A especificação menciona `app/`, mas o Initializr gerou o
-  projeto na raiz; o código e a infraestrutura foram mantidos aqui.
+- **Projeto na raiz do repositório.** O Initializr gerou o projeto na raiz, e o código, o
+  `Dockerfile`, o compose e as configurações da stack ficaram lado a lado, sem subpastas por serviço.
 - **`RandomGenerator` = `java.util.Random`.** É thread-safe (o scheduler e as requisições
   compartilham a instância) e continua sendo substituível por `new Random(seed)` nos testes.
 - **Relacionamentos como `Long` (`userId`, `eventId`, `walletId`)** em vez de `@ManyToOne`.
@@ -614,10 +682,20 @@ fixa e `@MockitoBean`. São os mesmos executados pelo job `build` da pipeline.
   `-javaagent`), conforme recomendado para JDK 21+.
 - **Testes fora do build da imagem.** O Dockerfile usa `-DskipTests`: os testes já rodam no job
   `build`, e o `publish-image` só executa depois dele passar.
-- **Imagem publicada como padrão do compose.** `docker compose up -d` usa a imagem do GHCR e não
-  exige JDK; `--build` continua disponível para testar o código local.
+- **`build` e `image` juntos no serviço `app`.** `docker compose up --build` compila o código local
+  pelo Dockerfile multistage (o comando do enunciado), e `docker compose up -d` sem `--build` usa a
+  imagem já publicada no GHCR. Nenhum dos dois exige JDK na máquina.
+- **Valores padrão em todas as variáveis do compose** (`${VAR:-padrão}`). A stack sobe de primeira
+  sem `.env`; o `lint` da pipeline roda `docker compose config` sem `.env` para garantir isso.
+- **Ordem de subida por `healthcheck`, não por tempo.** Cada serviço só sobe quando as dependências
+  respondem (`condition: service_healthy`), então não há `sleep` nem reinício manual.
+- **Imagem construída em todo PR, publicada só na `main`.** O PR valida que o `Dockerfile` e o
+  `pom.xml` ainda geram a imagem antes do merge, sem poluir o registry com imagens não aprovadas.
 - **Configuração do Graylog por script, não por volume.** Input e stream são criados pela API no
   `graylog-init`, de forma idempotente, em vez de depender de um dump do MongoDB.
+- **4xx em `WARN`, 5xx em `ERROR`.** Rejeições de negócio são esperadas (saldo insuficiente,
+  validação) e não devem parecer falhas; só o que é falha do servidor sai como `ERROR`, o que deixa
+  a busca `level_name:ERROR` e o stream WARN/ERROR úteis para investigar problemas reais.
 - **GELF via UDP e assíncrono.** Uma falha ou lentidão do Graylog nunca afeta as requisições; em
   troca, mensagens podem ser perdidas se o Graylog estiver fora.
 - **`numbersAsString` no GELF.** Mantém o tipo dos campos estável no OpenSearch (ex.: `userId`
